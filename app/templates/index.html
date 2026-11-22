@@ -1,0 +1,626 @@
+{% extends "base.html" %}
+{% block body_class %}app{% endblock %}
+{% block main_class %}wb-main{% endblock %}
+{% block header %}{% include "_menubar.html" %}{% endblock %}
+{% block content %}
+{% macro chk(name, label, hint='') -%}
+  <label class="check"><input type="checkbox" name="{{ name }}" value="yes" {% if form[name] %}checked{% endif %}>
+    <span>{{ label }}{% if hint %} <span class="muted">— {{ hint }}</span>{% endif %}</span></label>
+{%- endmacro %}
+{% macro err(name) -%}{% if errors[name] %}<div class="err">{{ errors[name] }}</div>{% endif %}{%- endmacro %}
+{% set section_of = {'max_urls': 'limits', 'max_depth': 'limits', 'max_query_params': 'limits', 'render_timeout': 'render',
+   'timeout': 'advanced', 'retries_5xx': 'advanced', 'custom_robots': 'robots', 'remove_params': 'rewrite', 'include': 'include',
+   'exclude': 'exclude', 'delay': 'speed', 'threads': 'speed', 'ua_custom': 'ua', 'headers': 'headers', 'dns_map': 'network',
+   'near_dup_threshold': 'content', 'psi_max_urls': 'apis', 'local_phone': 'local', 'local_exclude': 'local',
+   'block_hosts': 'render', 'js_click_max': 'render'} %}
+{% macro cb(key, label, locked=false, help=none) -%}
+  {% if locked or not key %}<label class="check"><input type="checkbox" checked disabled> <span {% if help %}data-help="{{ help }}"{% endif %}>{{ label }}</span></label>
+  {% else %}<label class="check"><input type="checkbox" name="{{ key }}" value="yes" {% if form[key] %}checked{% endif %}> <span>{{ label }}</span></label>{% endif %}
+{%- endmacro %}
+{% macro rs(label, crawl_key, store_key, help=none) -%}
+  <div class="rs-row"><span class="rs-label" {% if help %}data-help="{{ help }}"{% endif %}>{{ label }}</span>
+    {% if crawl_key is none %}<label><input type="checkbox" checked disabled> Rastrear</label>
+    {% elif crawl_key is sameas false %}<label class="off"><input type="checkbox" disabled> Rastrear</label>
+    {% else %}<label><input type="checkbox" name="{{ crawl_key }}" value="yes" {% if form[crawl_key] %}checked{% endif %}> Rastrear</label>{% endif %}
+    {% if store_key is none %}<label><input type="checkbox" checked disabled> Almacenar</label>
+    {% else %}<label><input type="checkbox" name="{{ store_key }}" value="yes" {% if form[store_key] %}checked{% endif %}> Almacenar</label>{% endif %}
+  </div>
+{%- endmacro %}
+{% macro val(key) -%}{{ form.get(key) if form.get(key) not in (none, '') else opt_defaults.get(key, 0) }}{%- endmacro %}
+{% macro num(key, label, lo, hi) -%}
+  <div class="lim-row"><span>{{ label }}</span><input id="{{ key }}" name="{{ key }}" type="number" min="{{ lo }}" max="{{ hi }}" value="{{ val(key) }}"></div>{{ err(key) }}
+{%- endmacro %}
+{% macro lim(key, label, lo, hi, suggest, label2=none) -%}
+  {% set v = (form.get(key) or 0) | int %}
+  <div class="lim-row"><label class="check"><input type="checkbox" data-lim="{{ key }}" {% if v > 0 %}checked{% endif %} data-change="limToggle" data-args='["$this"]'> <span {% if label2 %}data-help="{{ key }}"{% endif %}>{{ label }}</span></label>
+    {% if label2 %}</div><div class="lim-row"><span>{{ label2 }}</span>{% endif %}
+    <input id="{{ key }}" name="{{ key }}" type="number" min="{{ lo }}" max="{{ hi }}" value="{{ v if v > 0 else suggest }}" {% if v <= 0 %}disabled{% endif %}></div>{{ err(key) }}
+{%- endmacro %}
+{% macro minmax(label, kmin, kmax) -%}
+  <div class="mm-row"><span>{{ label }}</span><span class="mm">Mín.</span><input name="{{ kmin }}" type="number" min="1" max="3000" value="{{ val(kmin) }}" aria-label="{{ label }} mínimo">
+    <span class="mm">Máx.</span><input name="{{ kmax }}" type="number" min="1" max="3000" value="{{ val(kmax) }}" aria-label="{{ label }} máximo"></div>
+{%- endmacro %}
+{% set _ = section_of.update(option_sections or {}) %}
+{% macro opts(section) -%}
+  {% for key, default, sec, label, hint in opt_bools if sec == section %}{{ chk(key, label, hint) }}{% endfor %}
+  {% for key, (default, choices, sec, label) in (opt_selects or {}).items() if sec == section %}
+    <div class="field"><label for="{{ key }}">{{ label }}</label>
+      <select id="{{ key }}" name="{{ key }}">{% for v, l in choices.items() %}<option value="{{ v }}" {% if (form.get(key) or default) == v %}selected{% endif %}>{{ l }}</option>{% endfor %}</select></div>
+  {% endfor %}
+  {% set nums = opt_numbers | selectattr(4, 'equalto', section) | list %}
+  {% if nums %}<div class="num-grid">
+  {% for key, default, lo, hi, sec, label in nums %}
+    <div class="field"><label for="{{ key }}">{{ label }}</label>
+      <input id="{{ key }}" name="{{ key }}" type="number" min="{{ lo }}" max="{{ hi }}" value="{{ form.get(key) if form.get(key) is not none else default }}">{{ err(key) }}</div>
+  {% endfor %}</div>{% endif %}
+  {% for key, default, sec, label, rows in opt_texts if sec == section %}
+    <div class="field" style="max-width:none"><label for="{{ key }}">{{ label }}</label>
+      <textarea id="{{ key }}" name="{{ key }}" rows="{{ rows }}">{{ form.get(key) if form.get(key) is not none else default }}</textarea>{{ err(key) }}</div>
+  {% endfor %}
+{%- endmacro %}
+{% set ns = namespace(secs=[]) %}
+{% for k in errors %}
+  {% if k in section_of %}{% set ns.secs = ns.secs + [section_of[k]] %}{% elif k.startswith('extract_expr_') %}{% set ns.secs = ns.secs + ['extract'] %}{% endif %}
+{% endfor %}
+{% set first_error = ns.secs %}
+<form class="urlbar-form" method="post" action="/crawls" novalidate id="crawl-form" enctype="multipart/form-data">
+  <input type="hidden" name="cfg_panel" value="1">
+  <input type="hidden" name="preset" id="preset" value="">
+  {% set mode = form.mode or 'spider' %}
+  <div class="urlbar">
+    <a class="ub-brand" href="/" title="Nueva auditoría"><span class="brand-pill">Lets</span>Crawlit</a>
+    <select class="ub-select" id="mode" name="mode" data-change="setMode" data-args='["$value"]' aria-label="Modo de rastreo">
+      <option value="spider" {% if mode == 'spider' %}selected{% endif %}>Sitio web</option>
+      <option value="list" {% if mode == 'list' %}selected{% endif %}>Lista</option>
+    </select>
+    <div class="ub-url" id="mode-spider" {% if mode == 'list' %}hidden{% endif %}>
+      <input id="url" name="url" type="url" placeholder="Escribe la URL que quieres analizar" value="{{ form.url or '' }}" autofocus aria-label="URL que quieres analizar"></div>
+    <select class="ub-select" id="scope" aria-label="Qué parte de la web rastrear" title="Qué parte de la web rastrear" {% if mode == 'list' %}hidden{% endif %}>
+      <option value="subdomain">Subdominio</option>
+      <option value="folder">Subcarpeta</option>
+      <option value="all">Todos los subdominios</option>
+      <option value="exact">URL exacta</option>
+    </select>
+    <div class="ub-url" id="mode-list-bar" {% if mode != 'list' %}hidden{% endif %}>
+      <button type="button" class="ub-listbtn" data-click="openDlg" data-args='["list-dlg"]'>{{ 'Editar la lista de URLs…' if form.urls else 'Pegar o subir la lista de URLs…' }}</button></div>
+    <label class="ub-ack" title="{{ ack_text }}"><input type="checkbox" name="ack" value="yes" {% if form.ack %}checked{% endif %}> Tengo permiso</label>
+    <button type="button" class="ub-btn ghost" data-click="openCfg" title="Configuración del rastreo">Configuración</button>
+    <button type="submit" class="ub-btn">Rastrear</button>
+    <button type="button" class="ub-btn ghost" data-click="clearUrl">Vaciar</button>
+    <div class="ub-progress"></div>
+    </div>
+  {% if saved or errors %}<div class="ub-alerts">
+    {% if saved %}<div class="alert ok" role="status">{{ saved }}</div>{% endif %}
+    {% if errors %}<div class="alert error" role="alert">{% for k in ('url', 'urls', 'ack') if errors[k] %}{{ errors[k] }} {% endfor %}{% if config_error %}Revisa los campos marcados en Configuración.{% endif %}</div>{% endif %}
+  </div>{% endif %}
+  <dialog class="note-dlg" id="list-dlg" style="width:min(640px, calc(100vw - 32px))">
+    <div style="display:flex; align-items:center"><h3 style="margin:0">Modo lista</h3><span style="flex:1"></span>
+      <button type="button" class="secondary mini" data-click="closeDialog" data-args='["$this"]' aria-label="Cerrar">Cerrar</button></div>
+    <label for="urls">URLs (una por línea; un sitemap .xml se expande)</label>
+    <textarea id="urls" name="urls" rows="10" style="width:100%; font:13px var(--mono)"
+              placeholder="https://misitio.es/&#10;https://misitio.es/servicios&#10;https://misitio.es/sitemap.xml">{{ form.urls or '' }}</textarea>
+    <label class="check" style="margin-top:6px; font-weight:400">o sube un archivo CSV/TXT con URLs:
+      <input type="file" name="urls_file" accept=".csv,.txt,text/csv,text/plain" style="margin-left:6px"></label>
+    {{ err('urls') }}
+    <p style="margin:10px 0 0; text-align:right"><button type="button" class="mini" data-click="closeDialog" data-args='["$this"]'>Aceptar</button></p>
+  </dialog>
+  <dialog class="cfg" id="cfg">
+    <div class="cfg-wrap">
+      <div class="cfg-head"><span class="cfg-logo" aria-hidden="true">L</span> Configuración del rastreo <span class="spacer" style="flex:1"></span>
+        <button type="button" class="cfg-x" data-click="cancelCfg" aria-label="Cerrar">Cerrar</button></div>
+      {% set ico = {
+        'gear': '<circle cx="8" cy="8" r="2.3"/><path d="M8 1.5v2M8 12.5v2M1.5 8h2M12.5 8h2M3.4 3.4l1.4 1.4M11.2 11.2l1.4 1.4M3.4 12.6l1.4-1.4M11.2 4.8l1.4-1.4"/>',
+        'cols': '<rect x="2" y="3" width="12" height="10" rx="1"/><path d="M2 6h12M8 6v7"/>',
+        'robot': '<rect x="3" y="5.5" width="10" height="7.5" rx="2"/><path d="M8 2.5v3M6 9h.01M10 9h.01M1.5 9v2M14.5 9v2"/>',
+        'edit': '<rect x="2" y="2.5" width="11" height="11" rx="1"/><path d="M6 10.5l.5-2 5-5 1.5 1.5-5 5z"/>',
+        'ok': '<circle cx="8" cy="8" r="6"/><path d="M5.5 8.2l1.8 1.8 3.3-3.8"/>',
+        'no': '<circle cx="8" cy="8" r="6"/><path d="M6 6l4 4M10 6l-4 4"/>',
+        'gauge': '<path d="M2.3 12a6 6 0 1 1 11.4 0z"/><path d="M8 11l2.5-4"/>',
+        'user': '<circle cx="8" cy="5.5" r="2.5"/><path d="M3 14c0-3 2.2-4.5 5-4.5s5 1.5 5 4.5"/>',
+        'h': '<path d="M4 3v10M12 3v10M4 8h8" stroke-width="2.2"/>',
+        'net': '<circle cx="8" cy="3.5" r="1.6"/><circle cx="3.5" cy="12.5" r="1.6"/><circle cx="12.5" cy="12.5" r="1.6"/><path d="M8 5.1v3.4M8 8.5l-3.4 2.8M8 8.5l3.4 2.8"/>',
+        'tools': '<path d="M3 13l5.5-5.5M10.5 2.5a2.8 2.8 0 0 0-1.9 4l4.4 4.4a1.2 1.2 0 0 1-1.7 1.7L6.9 8.2a2.8 2.8 0 0 1-4-1.9l1.8 1 1.4-1.4-1-1.8"/>',
+        'globe': '<circle cx="8" cy="8" r="6"/><ellipse cx="8" cy="8" rx="2.6" ry="6"/><path d="M2 8h12"/>',
+        'lock': '<rect x="3.5" y="7" width="9" height="7" rx="1"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/>',
+        'search': '<circle cx="7" cy="7" r="4.3"/><path d="M10.3 10.3L14 14"/>'} %}
+      {% set tree = [
+        ('grp', 'spider', 'Rastreador', 'gear', [('crawl', 'Rastreo'), ('extraction', 'Extracción'), ('limits', 'Límites'),
+                                               ('render', 'Renderizado'), ('advanced', 'Avanzado'), ('prefs', 'Preferencias')]),
+        ('grp', 'contenido', 'Contenido', 'cols', [('content', 'Duplicados y ortografía')]),
+        ('leaf', 'robots', 'robots.txt', 'robot', []), ('leaf', 'rewrite', 'Reescritura de URL', 'edit', []),
+        ('leaf', 'include', 'Incluir', 'ok', []), ('leaf', 'exclude', 'Excluir', 'no', []),
+        ('leaf', 'speed', 'Velocidad', 'gauge', []), ('leaf', 'ua', 'User-Agent', 'user', []),
+        ('leaf', 'headers', 'Header HTTP', 'h', []), ('leaf', 'network', 'DNS y proxy', 'net', []),
+        ('grp', 'custom', 'Personalizado', 'tools', [('search', 'Búsqueda personalizada'), ('extract', 'Extracción personalizada'), ('local', 'SEO local')]),
+        ('leaf', 'apis', 'Conectar APIs', 'globe', []), ('leaf', 'auth', 'Autenticación', 'lock', []),
+        ('leaf', 'analysis', 'Análisis del rastreo', 'search', [])] %}
+      <div class="cfg-side">
+        <input type="search" class="cfg-search" placeholder="Buscar..." data-input="filterCfg" data-args='["$value"]' aria-label="Buscar en la configuración">
+        <nav class="cfg-nav">
+          {% for kind, key, label, icon, kids in tree %}
+            {% if kind == 'grp' %}
+              <a class="grp {{ 'err-dot' if kids | map('first') | select('in', first_error) | list }}" data-grp="{{ key }}" data-label="{{ label }}" data-click="toggleGrp" data-args='{{ [key] | tojson }}'><span class="tw" aria-hidden="true">▾</span><svg class="ni" viewBox="0 0 16 16" aria-hidden="true">{{ ico[icon] | safe }}</svg>{{ label }}</a>
+              {% for k, l in kids %}<a class="sub {{ 'err-dot' if k in first_error }}" data-sec="{{ k }}" data-parent="{{ key }}" data-crumb="{{ label }} › {{ l }}" data-click="showSec" data-args='{{ [k] | tojson }}'>{{ l }}</a>{% endfor %}
+            {% else %}
+              <a class="leaf {{ 'err-dot' if key in first_error }}" data-sec="{{ key }}" data-crumb="{{ label }}" data-click="showSec" data-args='{{ [key] | tojson }}'><span class="tw" aria-hidden="true"></span><svg class="ni" viewBox="0 0 16 16" aria-hidden="true">{{ ico[icon] | safe }}</svg>{{ label }}</a>
+            {% endif %}
+          {% endfor %}
+        </nav>
+      </div>
+      <div class="cfg-body">
+        <div class="cfg-crumb"><h2 id="cfg-crumb">Configuración del rastreo</h2>
+          <span class="cfg-guide">Pulsa el ? de cada opción para ver qué hace.</span></div>
+        <section data-sec="crawl">
+          <h3>Rastreador › Rastreo</h3>
+          <p class="desc">Selecciona los tipos de enlace que deseas rastrear y almacenar, y define el comportamiento del rastreo. Esta configuración se puede utilizar para guiar el rastreo y, a su vez, puede influir en el número de URL que se detecten, rastreen y declaren.</p>
+          <div class="box-grid">
+            <fieldset class="box"><legend>Enlaces de recursos</legend>
+              {{ rs('Imágenes', 'crawl_images', 'store_images') }}{{ rs('Multimedia', 'crawl_media', 'store_media') }}
+              {{ rs('CSS', 'crawl_css', 'store_css') }}{{ rs('JavaScript', 'crawl_js', 'store_js') }}
+              <div class="box-sep"></div>
+              {{ cb('check_resources', 'Comprobar el estado de los recursos (petición HEAD)') }}
+            </fieldset>
+            <fieldset class="box"><legend>Comportamiento de rastreo</legend>
+              {{ cb('check_outside_folder', 'Comprobar enlaces fuera de la carpeta de inicio') }}
+              {{ cb('crawl_outside_folder', 'Rastrear fuera de la carpeta de inicio') }}
+              {{ cb('crawl_subdomains', 'Rastrear todos los subdominios') }}
+              {{ cb('follow_nofollow_internal', 'Seguir «nofollow» interno') }}
+              {{ cb('follow_nofollow_external', 'Seguir «nofollow» externo') }}
+            </fieldset>
+            <fieldset class="box"><legend>Enlaces de páginas</legend>
+              {{ rs('Enlaces internos', none, none, help='crawl_internal') }}{{ rs('Enlaces externos', 'check_external', 'store_external') }}
+              {{ rs('Canonicals', 'crawl_canonicals', 'store_canonicals') }}{{ rs('Paginación (rel next/prev)', 'crawl_pagination', 'store_pagination') }}
+              {{ rs('Hreflang', 'crawl_hreflang', 'store_hreflang') }}{{ rs('AMP', 'crawl_amp', 'store_amp') }}
+              {{ rs('Meta refresh', 'crawl_meta_refresh', 'store_meta_refresh') }}{{ rs('iframes', 'crawl_iframes', 'store_iframes') }}
+              {{ rs('Alternativa móvil', 'crawl_mobile_alt', 'store_mobile_alt') }}
+              {{ rs('Enlaces no rastreables', false, 'store_uncrawlable') }}
+            </fieldset>
+            <fieldset class="box"><legend>sitemaps XML</legend>
+              {{ cb('crawl_linked_sitemaps', 'Rastrear sitemaps XML enlazados') }}
+              <p class="box-note">Y además:</p>
+              {{ cb('crawl_sitemaps', 'Descubrir automáticamente sitemaps XML mediante robots.txt') }}
+              <p class="box-note">Rastrear estos sitemaps:</p>
+              <textarea name="custom_sitemaps" rows="5" aria-label="Rastrear estos sitemaps" placeholder="https://misitio.es/sitemap_index.xml">{{ form.get('custom_sitemaps') or '' }}</textarea>{{ err('custom_sitemaps') }}
+            </fieldset>
+          </div>
+          <p class="muted">Siempre activos: respetar robots.txt y seguir las redirecciones internas. Los recursos con «Rastrear» desactivado no se piden al servidor; con «Almacenar» aparecen igualmente como enlaces de la página.</p>
+        </section>
+        <section data-sec="extraction">
+          <h3>Rastreador › Extracción</h3>
+          <p class="desc">Elige qué datos se extraen y se guardan de cada URL. Desactivar los que no necesitas reduce el tamaño de la auditoría.</p>
+          <div class="box-grid three">
+            <fieldset class="box"><legend>Detalles de página</legend>
+              {{ cb('ext_title', 'Título de página') }}{{ cb('ext_description', 'Meta description') }}{{ cb('ext_keywords', 'Meta palabras clave') }}
+              {{ cb('ext_h1', 'H1') }}{{ cb('ext_h2', 'H2') }}{{ cb(none, 'Indexabilidad', locked=true, help='indexability') }}
+              {{ cb('ext_word_count', 'Recuento de palabras') }}{{ cb('extract_readability', 'Lectura') }}
+              {{ cb('extract_text_ratio', 'Proporción de texto y código') }}{{ cb('ext_hash', 'Valor de hash') }}
+              {{ cb('ext_page_size', 'Tamaño de página') }}{{ cb('extract_forms', 'Formularios') }}{{ cb('ext_a11y', 'Accesibilidad') }}
+            </fieldset>
+            <fieldset class="box"><legend>Detalles de URL</legend>
+              {{ cb('ext_response_time', 'Tiempo de respuesta') }}{{ cb('ext_last_modified', 'Última modificación') }}
+              {{ cb('ext_headers', 'Encabezados HTTP') }}{{ cb('extract_cookies', 'Cookies') }}
+            </fieldset>
+            <fieldset class="box"><legend>Directivas</legend>
+              {{ cb('ext_meta_robots', 'Meta robots') }}{{ cb('ext_x_robots', 'X-Robots-Tag') }}
+            </fieldset>
+            <fieldset class="box"><legend>Datos estructurados</legend>
+              {{ cb('ext_jsonld', 'JSON-LD') }}{{ cb('ext_microdata', 'Microdatos') }}{{ cb('ext_rdfa', 'RDFa') }}
+              {{ cb('ext_schema_validation', 'Validación de Schema.org y de resultados enriquecidos') }}
+            </fieldset>
+            <fieldset class="box"><legend>HTML</legend>
+              {{ cb('store_html', 'Almacenar HTML') }}{{ cb('store_rendered_html', 'Almacenar HTML renderizado') }}
+            </fieldset>
+            <fieldset class="box"><legend>PDF</legend>
+              {{ cb('extract_pdf', 'Extraer propiedades del PDF') }}
+            </fieldset>
+          </div>
+          <p class="muted">Desactivar un dato hace que no se guarde (y que sus filtros y problemas salgan vacíos), como si la página no lo tuviera.</p>
+        </section>
+        <section data-sec="limits">
+          <h3>Rastreador › Límites</h3>
+          <p class="desc">Controla el alcance del rastreo: número total de URL, profundidad, carpetas, parámetros y tamaño de lo que se descarga.</p>
+          <div class="lim-grid">
+            <div>
+              {{ lim('max_urls', 'Limitar rastreo total', 1, settings.max_urls_limit or 10000000, 10000) }}
+              {{ lim('max_urls_per_subdomain', 'Limitar rastreo total por subdominio', 1, 100000, 1000) }}
+              {{ lim('max_depth', 'Limitar nivel de profundidad', 1, 100, 5) }}
+              {{ lim('max_urls_per_depth', 'Limitar las URLs por nivel de profundidad', 1, 100000, 1000) }}
+              {{ lim('max_folder_depth', 'Limitar nivel de carpetas', 1, 50, 5) }}
+              {{ lim('max_query_params', 'Limitar número de cadenas de consulta', 1, 50, 5) }}
+            </div>
+            <div>
+              {{ num('max_redirects', 'Máximo de redirecciones que seguir', 0, 20) }}
+              {{ num('max_url_length', 'Máximo de longitud para las URLs que rastrear', 20, 10000) }}
+              {{ num('max_links_per_page', 'Máximo de enlaces que rastrear en cada URL', 1, 100000) }}
+              {{ num('max_page_size_kb', 'Máximo de tamaño de página que rastrear (en KB)', 50, 51200) }}
+            </div>
+          </div>
+          <fieldset class="box line"><legend>Limitar por ruta URL</legend>
+            <p class="box-note">Define una lista de patrones de expresión regular de URL y un número máximo de URL que rastrear para cada uno (uno por línea: «patrón número»).</p>
+            <textarea name="path_limits" rows="5" aria-label="Limitar por ruta URL" placeholder="/blog/ 50&#10;/etiqueta/ 0">{{ form.get('path_limits') or '' }}</textarea>{{ err('path_limits') }}
+          </fieldset>
+        </section>
+        <section data-sec="advanced">
+          <h3>Rastreador › Avanzado</h3>
+          <p class="desc">Opciones avanzadas que cambian cómo se interpretan las respuestas y qué URL aparecen en los resultados.</p>
+          <div class="adv-list">
+            <div class="lim-row"><span>Almacenamiento de cookies</span>
+              <select id="cookie_storage" name="cookie_storage">{% for v, l in opt_selects.cookie_storage[1].items() %}<option value="{{ v }}" {% if (form.get('cookie_storage') or 'session') == v %}selected{% endif %}>{{ 'Solo de sesión' if v == 'session' else 'No almacenar' }}</option>{% endfor %}</select></div>
+            {{ cb('ignore_nonindexable', 'Ignorar URL no indexables en los problemas') }}
+            {{ cb('ignore_pagination_duplicates', 'Ignorar URLs de paginación para filtros duplicados') }}
+            {{ cb('always_follow_redirects', 'Seguir siempre redirecciones') }}
+            {{ cb('always_follow_canonicals', 'Seguir siempre canonicals') }}
+            {{ cb('respect_noindex', 'Respetar noindex') }}
+            {{ cb('respect_canonicals', 'Respetar canonicals') }}
+            {{ cb('respect_next_prev', 'Respetar rel next/prev') }}
+            {{ cb('respect_hsts', 'Respetar política HSTS') }}
+            {{ cb('respect_self_refresh', 'Respetar meta refresh autorreferenciada') }}
+            {{ cb('extract_srcset', 'Extraer imágenes del atributo srcset') }}
+            {{ cb('crawl_fragments', 'Rastrear identificadores de fragmento') }}
+            {{ cb('html_validation', 'Efectuar validación HTML') }}
+            {{ cb('carbon', 'Cálculo de la huella de carbono') }}
+            {{ cb('assume_html', 'Dar por hecho que las páginas son HTML') }}
+            {{ cb('verify_ssl', 'Verificar certificados SSL/TLS') }}
+            <div class="lim-row"><span>Tiempo de espera de respuesta (segundos)</span><input id="timeout" name="timeout" type="number" min="3" max="120" value="{{ form.timeout or 20 }}"></div>{{ err('timeout') }}
+            <div class="lim-row"><span>Reintentos de respuesta 5xx</span><input id="retries_5xx" name="retries_5xx" type="number" min="0" max="3" value="{{ form.retries_5xx or 0 }}"></div>{{ err('retries_5xx') }}
+          </div>
+        </section>
+        <section data-sec="prefs">
+          <h3>Rastreador › Preferencias</h3>
+          <p class="desc">Umbrales que deciden cuándo un título, una descripción, una página o un enlace se marca como problema.</p>
+          <div class="box-grid">
+            <fieldset class="box"><legend>Ancho del título de página</legend>
+              {{ minmax('Píxeles', 'title_px_min', 'title_px_max') }}{{ minmax('Caracteres', 'title_min', 'title_max') }}
+            </fieldset>
+            <fieldset class="box"><legend>Ancho de la meta description</legend>
+              {{ minmax('Píxeles', 'desc_px_min', 'desc_px_max') }}{{ minmax('Caracteres', 'desc_min', 'desc_max') }}
+            </fieldset>
+            <fieldset class="box"><legend>Enlaces</legend>
+              {{ num('high_external_outlinks', 'Gran cantidad de enlaces de salida externos', 1, 100000) }}
+              {{ num('high_internal_outlinks', 'Gran cantidad de enlaces de salida internos', 1, 100000) }}
+              {{ num('high_depth', 'Gran nivel de profundidad', 1, 100) }}
+              <p class="box-note">Texto de anclaje no descriptivo:</p>
+              <textarea name="nondescriptive_anchors" rows="9" aria-label="Texto de anclaje no descriptivo">{{ form.get('nondescriptive_anchors') if form.get('nondescriptive_anchors') is not none else opt_defaults.nondescriptive_anchors }}</textarea>
+            </fieldset>
+            <fieldset class="box"><legend>Otro</legend>
+              {{ num('url_max', 'Límite de caracteres de la URL', 20, 2000) }}{{ num('h1_max', 'Límite de caracteres de H1', 10, 500) }}
+              {{ num('h2_max', 'Límite de caracteres de H2', 10, 500) }}{{ num('alt_max', 'Límite de caracteres para el texto ALT de imágenes', 10, 1000) }}
+              {{ num('image_max_kb', 'Tamaño máximo de imagen en kilobytes', 1, 50000) }}{{ num('low_words', 'Contenido con poco recuento de palabras', 0, 5000) }}
+              {{ num('doc_max_mb', 'Tamaño máximo válido del documento (MB)', 1, 100) }}{{ num('resource_max_mb', 'Tamaño máximo válido de los recursos (MB)', 1, 500) }}
+              <p class="box-note">Frases de error 404 leve:</p>
+              <textarea name="soft404_phrases" rows="9" aria-label="Frases de error 404 leve">{{ form.get('soft404_phrases') if form.get('soft404_phrases') is not none else opt_defaults.soft404_phrases }}</textarea>
+            </fieldset>
+          </div>
+          {% for k in ('title_min', 'desc_min') %}{{ err(k) }}{% endfor %}
+        </section>
+        <section data-sec="robots">
+          <h3>robots.txt</h3>
+          <p class="desc">Controla cómo se trata el archivo robots.txt del sitio y prueba tus propias reglas antes de publicarlas.</p>
+          <select disabled aria-label="Comportamiento con robots.txt" style="width:260px"><option>Respetar robots.txt</option></select>
+          <p class="box-note">LetsCrawlit respeta siempre el robots.txt real del sitio.</p>
+          {{ cb('show_blocked_internal', 'Mostrar URLs internas bloqueadas por robots.txt') }}
+          {{ cb('show_blocked_external', 'Mostrar URL externas bloqueadas por robots.txt') }}
+          <fieldset class="box line"><legend>Robot personalizado</legend>
+            <p class="box-note">Escribe tu propio robots.txt para usarlo en un rastreo, o descarga y modifica el del sitio. Se aplica <strong>además</strong> del real: solo puede bloquear más, nunca menos.</p>
+            <div class="robots-ed">
+              <div class="robots-list"><div class="rl-head">Subdominios</div><div class="rl-item" id="robots-site">(la URL escrita arriba)</div></div>
+              <div class="robots-main">
+                <div class="code-ed"><pre class="gutter" id="robots-gutter" aria-hidden="true">1</pre>
+                  <div id="robots-editor"><textarea id="custom_robots" name="custom_robots" rows="12" spellcheck="false" placeholder="User-agent: *&#10;Disallow: /wp-admin/&#10;Allow: /wp-admin/admin-ajax.php">{{ form.custom_robots or '' }}</textarea></div></div>
+                <div class="ed-status" id="robots-pos">Ln 1, Col 1</div>
+                <div class="ed-tools">
+                  <button type="button" class="secondary mini" hx-post="/tools/fetch-robots" hx-target="#robots-editor" hx-swap="outerHTML" hx-include="#url, #custom_robots">⤓ Descargar robots.txt</button>
+                  <button type="button" class="secondary mini" data-click="clearRobots">Borrar</button></div>
+              </div>
+            </div>
+            {{ err('custom_robots') }}
+            <div class="robots-test">
+              <input type="text" id="robots_test_urls" name="robots_test_urls" placeholder="indica la URL o ruta que quieres probar" value="{{ form.robots_test_urls or '' }}" aria-label="URL que quieres probar">
+              <button type="button" class="secondary mini" hx-post="/tools/robots-test" hx-target="#robots-result" hx-swap="outerHTML">Probar</button>
+            </div>
+            <div id="robots-result"></div>
+          </fieldset>
+        </section>
+        <section data-sec="speed">
+          <h3>Velocidad</h3>
+          <p class="desc">Controla la velocidad del rastreo para no sobrecargar el servidor.</p>
+          <div class="adv-list">
+            <div class="lim-row"><span>Máx. hilos</span><input id="threads" name="threads" type="number" min="1" max="5" value="{{ form.threads or 1 }}"></div>{{ err('threads') }}
+            <div class="lim-row"><span>Pausa entre peticiones (s)</span><input id="delay" name="delay" type="number" step="0.1" min="{{ settings.min_delay }}" max="60" value="{{ form.delay }}"></div>{{ err('delay') }}
+            {{ lim('max_urls_per_second', 'Limitar URL', 1, 50, 2, label2='Máx. URL/s') }}
+          </div>
+          <p class="muted">La pausa se respeta entre todos los hilos; si robots.txt pide un Crawl-delay mayor, se usa ese.</p>
+        </section>
+        <section data-sec="custom">
+          <h3>Personalizado</h3>
+          <fieldset class="box"><legend>Páginas</legend>
+            <a class="box-link" data-click="showSec" data-args='["search"]'>Búsqueda personalizada</a>
+            <a class="box-link" data-click="showSec" data-args='["extract"]'>Extracción personalizada</a>
+            <a class="box-link" data-click="showSec" data-args='["local"]'>SEO local</a>
+          </fieldset>
+        </section>
+        <section data-sec="analysis">
+          <h3>Análisis del rastreo</h3>
+          <p class="desc">Cálculos que necesitan el rastreo completo y se hacen al terminar.</p>
+          <fieldset class="box line"><legend>Al terminar cada rastreo se calcula</legend>
+            {% for t, d, hk in [('PageRank interno (Link Score)', 'Asigna una puntuación de autoridad a todas las URL internas', 'an_linkscore'),
+                            ('Códigos de respuesta', 'Cadena de redirecciones internas, bucle de redirecciones internas', 'an_codes'),
+                            ('Contenido', 'Casi duplicados, contenido escaso, ortografía', 'an_content'),
+                            ('Canonicals', 'Cadenas, canonical a no indexables, a otro dominio', 'an_canonicals'),
+                            ('Paginación', 'URL de paginación no 200, paginación con noindex', 'an_pagination'),
+                            ('Hreflang', 'Sin retorno, sin autorreferencia, códigos no válidos', 'an_hreflang'),
+                            ('Enlaces', 'Páginas profundas, solo enlaces nofollow, enlaces a no indexables, navegación solo con clic', 'an_links'),
+                            ('Sitemaps', 'URLs en el sitemap, fuera del sitemap, huérfanas, no indexables en el sitemap', 'an_sitemaps'),
+                            ('Search Console y Analytics', 'URLs con tráfico y sin enlaces internos', 'an_analytics'),
+                            ('SEO local', 'Ficha del negocio, teléfono, contacto, servicio + ciudad', 'an_local')] %}
+              <label class="check analysis-row"><input type="checkbox" checked disabled> <span><strong data-help="{{ hk }}">{{ t }}</strong><br><small class="muted">{{ d }}</small></span></label>
+            {% endfor %}
+          </fieldset>
+          <label class="check"><input type="checkbox" checked disabled> <span data-help="an_auto">Analizar automáticamente al final del rastreo</span></label>
+        </section>
+        <section data-sec="apis">
+          <h3>Conectar APIs</h3>
+          <p class="desc">Conecta servicios externos para añadir datos de tráfico, rendimiento o IA a las URL rastreadas.</p>
+          <div class="api-list">
+            {% macro api(icon, color, name, connected, note='') -%}
+            <details class="api-row"><summary><span class="api-ico" style="background:{{ color }}">{{ icon }}</span>
+              <span class="api-name"><strong>{{ name }}</strong><br><span class="api-state {{ 'on' if connected }}">{{ 'Conectado' if connected else 'Desconectado' }}</span></span>
+              <span class="api-gear" title="Ajustes">Ajustes</span></summary>
+              <div class="api-body">{{ caller() }}</div></details>
+            {%- endmacro %}
+            {% call api('GSC', '#4285f4', 'Google Search Console', google_status.state == 'connected') %}
+              {% if google_status.state == 'unconfigured' %}Pon <code>GOOGLE_CLIENT_ID</code> y <code>GOOGLE_CLIENT_SECRET</code> en <code>.env</code> (cliente OAuth «App de escritorio»). Mientras tanto puedes importar su CSV desde cada auditoría.
+              {% elif google_status.state == 'disconnected' %}<a href="/integrations/google/connect?back=/">Conectar cuenta de Google</a> (solo lectura).
+              {% else %}{{ google_status.message }} Importa los datos desde cada auditoría: Archivo › Importar datos.{% endif %}
+            {% endcall %}
+            {% call api('GA4', '#f9ab00', 'Google Analytics 4', google_status.state == 'connected') %}
+              Usa la misma conexión de Google que Search Console. Importa sesiones y eventos clave desde Archivo › Importar datos.
+            {% endcall %}
+            {% call api('PSI', '#0f9d58', 'PageSpeed Insights', pagespeed_available) %}
+              <label class="check"><input type="checkbox" name="pagespeed" value="yes" {% if not pagespeed_available %}disabled{% elif form.pagespeed %}checked{% endif %}>
+                <span>Medir el rendimiento móvil (Lighthouse) {% if not pagespeed_available %}<span class="muted">— añade PAGESPEED_API_KEY en .env</span>{% else %}<span class="muted">— envía esas URLs a Google</span>{% endif %}</span></label>
+              <div class="lim-row"><span>Nº de URLs (la inicial + las más enlazadas)</span><input id="psi_max_urls" name="psi_max_urls" type="number" min="1" max="500" value="{{ form.psi_max_urls or 1 }}"></div>{{ err('psi_max_urls') }}
+            {% endcall %}
+            {% call api('IA', '#c77dff', 'Inteligencia artificial (Claude, OpenAI, Gemini u Ollama)', ai.enabled) %}
+              {% if ai.enabled %}Activa: {{ ai.provider }} · <code>{{ ai.model }}</code>. {% endif %}Elige el proveedor y pega tu clave, sin tocar archivos.
+              <p style="margin:8px 0 0"><button type="button" class="mini" data-click="openAiSetup">Configurar la IA…</button></p>
+            {% endcall %}
+            {% call api('CS', '#c0392b', 'Copyscape', ai_keys.copyscape) %}Copias de tus textos en otras webs: <code>COPYSCAPE_USER</code> y <code>COPYSCAPE_KEY</code> en <code>.env</code>.{% endcall %}
+          </div>
+          <p class="muted">Todo funciona sin conectar nada: cada servicio solo añade datos extra a las páginas rastreadas.</p>
+        </section>
+        <section data-sec="render">
+          <h3>Rastreador › Renderizado</h3>
+          <p class="desc">Ejecuta JavaScript con un navegador sin interfaz (Chromium, Edge o Chrome) para ver la página como Google.</p>
+          {{ chk('render', 'Renderizar JavaScript') }}
+          {{ chk('screenshots', 'Guardar una captura de pantalla de cada página', 'se ve en el panel inferior › Captura') }}
+          <div class="field"><label for="render_timeout">Tiempo máximo por página (s)</label>
+            <input id="render_timeout" name="render_timeout" type="number" min="3" max="120" value="{{ form.render_timeout }}">{{ err('render_timeout') }}</div>
+          <h4>Scripts de terceros</h4>
+          {{ chk('block_third_party', 'Bloquear scripts de terceros conocidos al renderizar', 'analítica, publicidad, píxeles sociales, chats… el rastreo va más rápido y el contenido SEO no cambia') }}
+          <details class="muted" style="margin:0 0 8px"><summary>Ver la lista ({{ blocklist_total }} dominios)</summary>
+            {% for cat, hosts in third_party.items() %}<p style="margin:6px 0"><strong>{{ cat }}:</strong> {{ hosts | join(', ') }}</p>{% endfor %}</details>
+          <div class="field" style="max-width:none"><label for="block_hosts">Bloquear también estos dominios (uno por línea; se aplica aunque desactives la lista)</label>
+            <textarea id="block_hosts" name="block_hosts" rows="3" placeholder="widget.ejemplo.com&#10;cdn.chatbot.es">{{ form.block_hosts or '' }}</textarea>{{ err('block_hosts') }}</div>
+          <h4>Enlaces que solo funcionan con clic</h4>
+          {{ chk('js_click', 'Hacer clic en botones y elementos con onclick para descubrir enlaces sin <a href>', 'para webs en React, Angular, Vue… más lento') }}
+          <div class="field"><label for="js_click_max">Máximo de clics por página</label>
+            <input id="js_click_max" name="js_click_max" type="number" min="1" max="100" value="{{ form.js_click_max or 20 }}">{{ err('js_click_max') }}</div>
+          <p class="muted">Seguro: nunca pulsa botones de formularios ni textos como «comprar», «eliminar», «enviar» o «aceptar», y mientras hace clic bloquea cualquier petición que no sea de lectura (POST, PUT, DELETE…). Las URLs encontradas se rastrean y se marcan como problema, porque Google no hace clic.</p>
+        </section>
+        <section data-sec="content">
+          <h3>Contenido</h3>
+          <p class="desc">Análisis del texto visible de cada página.</p>
+          {{ chk('spelling', 'Revisar ortografía', 'diccionario según el idioma de la página: es, en, fr, pt, de, it, nl…') }}
+          <div class="field" style="max-width:none"><label for="custom_dictionary">Diccionario personalizado (palabras correctas que no deben marcarse: marcas, barrios, términos del sector)</label>
+            <textarea id="custom_dictionary" name="custom_dictionary" rows="4" placeholder="bombín&#10;multipunto&#10;nombredemimarca">{{ form.custom_dictionary or '' }}</textarea></div>
+          <div class="field"><label for="near_dup_threshold">Umbral de casi duplicados (% de similitud)</label>
+            <input id="near_dup_threshold" name="near_dup_threshold" type="number" min="50" max="100" value="{{ form.near_dup_threshold or 90 }}">{{ err('near_dup_threshold') }}</div>
+          <div class="field" style="max-width:none"><label for="shared_dict">Diccionario {{ 'compartido' if dict_shared else 'de este equipo' }}: <code>{{ dict_path }}</code> ({{ dict_count }} palabras)</label>
+            <textarea id="shared_dict" name="words" rows="5" form="dict-form">{{ dict_text }}</textarea>
+            <button type="button" class="secondary mini" hx-post="/dictionary" hx-include="#shared_dict" hx-target="#dict-msg">Guardar diccionario</button> <span id="dict-msg"></span>
+            <p class="muted" style="margin:4px 0 0">{% if dict_shared %}Está en una carpeta compartida: lo que añadas aquí o con «+» en el panel inferior lo verá todo el equipo.{% else %}Para compartirlo con tu equipo, pon en <code>.env</code> <code>LETSCRAWL_SHARED_DICTIONARY=</code> con la ruta a un .txt dentro de Dropbox, Google Drive u OneDrive.{% endif %} Se aplica también a los rastreos ya hechos.</p></div>
+          <p class="muted">La gramática (concordancias, estilo) no se revisa: requeriría un servicio externo.</p>
+        </section>
+        <section data-sec="rewrite">
+          <h3>Reescritura de URL</h3>
+          <p class="desc">Normaliza las URLs descubiertas antes de rastrearlas (p. ej. quitar parámetros de campaña).</p>
+          {{ chk('strip_all_params', 'Eliminar todos los parámetros') }}
+          <div class="field"><label for="remove_params">Eliminar estos parámetros (uno por línea)</label>
+            <textarea id="remove_params" name="remove_params" rows="5" placeholder="utm_source&#10;utm_medium&#10;fbclid&#10;gclid">{{ form.remove_params or '' }}</textarea>{{ err('remove_params') }}</div>
+        </section>
+        <section data-sec="include">
+          <h3>Incluir</h3>
+          <p class="desc">Solo se rastrean las URLs que coincidan con alguna de estas expresiones regulares (una por línea). La URL inicial siempre se rastrea.</p>
+          <div class="field" style="max-width:none"><textarea name="include" rows="6" aria-label="Incluir" placeholder="https://misitio.es/servicios/.*&#10;.*/blog/.*">{{ form.include or '' }}</textarea>{{ err('include') }}</div>
+        </section>
+        <section data-sec="exclude">
+          <h3>Excluir</h3>
+          <p class="desc">Las URLs que coincidan con alguna de estas expresiones regulares no se rastrean (una por línea).</p>
+          <div class="field" style="max-width:none"><textarea name="exclude" rows="6" aria-label="Excluir" placeholder=".*\?replytocom=.*&#10;.*/etiqueta/.*&#10;.*\.pdf$">{{ form.exclude or '' }}</textarea>{{ err('exclude') }}</div>
+        </section>
+        <section data-sec="local">
+          <h3>SEO local</h3>
+          <p class="desc">Comprueba los datos del negocio (nombre, dirección, teléfono), el schema LocalBusiness, teléfono clicable, WhatsApp, mapa, página de contacto y que cada página de servicio nombre la ciudad. Todo es opcional: si lo dejas vacío se deduce del schema y del teléfono más repetido.</p>
+          {{ chk('local_enabled', 'Hacer la auditoría de SEO local') }}
+          <div class="field"><label for="local_name">Nombre del negocio</label>
+            <input id="local_name" name="local_name" type="text" placeholder="Cerrajería López" value="{{ form.local_name or '' }}"></div>
+          <div class="field"><label for="local_city">Ciudad o ciudades donde trabaja (separadas por comas)</label>
+            <input id="local_city" name="local_city" type="text" placeholder="Gijón, Oviedo, Avilés" value="{{ form.local_city or '' }}"></div>
+          <div class="field"><label for="local_phone">Teléfono principal</label>
+            <input id="local_phone" name="local_phone" type="text" placeholder="985 123 456" value="{{ form.local_phone or '' }}">{{ err('local_phone') }}</div>
+          <div class="field" style="max-width:none"><label for="local_exclude">Páginas que no son de servicio (regex, una por línea; ya se excluyen legales, contacto, blog, etiquetas…)</label>
+            <textarea id="local_exclude" name="local_exclude" rows="3" placeholder=".*/sobre-nosotros/.*&#10;.*/trabaja-con-nosotros/.*">{{ form.local_exclude or '' }}</textarea>{{ err('local_exclude') }}</div>
+        </section>
+        <section data-sec="network">
+          <h3>DNS y proxy</h3>
+          <p class="desc">Para migraciones: rastrea el servidor nuevo antes de cambiar las DNS, asignando el dominio a una IP concreta.</p>
+          <div class="field" style="max-width:none"><label for="dns_map">Resolución DNS manual (una por línea: dominio IP)</label>
+            <textarea id="dns_map" name="dns_map" rows="3" placeholder="misitio.es 203.0.113.10&#10;www.misitio.es 203.0.113.10">{{ form.dns_map or '' }}</textarea>{{ err('dns_map') }}</div>
+          <label class="check"><input type="checkbox" name="use_proxy" value="yes" {% if not proxy_available %}disabled{% elif form.use_proxy %}checked{% endif %}>
+            <span>Usar proxy {% if proxy_available %}(CRAWL_PROXY de .env){% else %}<span class="muted">— define CRAWL_PROXY en .env para activarlo</span>{% endif %}</span></label>
+        </section>
+        <section data-sec="ua">
+          <h3>User-Agent</h3>
+          <p class="desc">Identidad con la que se piden las páginas. También decide qué grupo de robots.txt se aplica (p. ej. «Googlebot»).</p>
+          <div class="field"><label for="ua_preset">Agente predefinido</label>
+            <select id="ua_preset" name="ua_preset" data-change="uaToggle" data-args='["$this"]'>
+              {% for key, p in ua_presets.items() %}<option value="{{ key }}" {% if (form.ua_preset or 'default') == key %}selected{% endif %}>{{ p[0] }}</option>{% endfor %}
+            </select></div>
+          <div class="field" id="ua_custom_wrap" {% if form.ua_preset != 'custom' %}hidden{% endif %}><label for="ua_custom">User-Agent personalizado</label>
+            <input id="ua_custom" name="ua_custom" type="text" value="{{ form.ua_custom or '' }}">{{ err('ua_custom') }}</div>
+          <p class="muted">Por defecto: <code>{{ settings.user_agent }}</code></p>
+        </section>
+        <section data-sec="headers">
+          <h3>Header HTTP</h3>
+          <p class="desc">Cabeceras extra en cada petición, una por línea con formato <code>Nombre: valor</code>. Las credenciales y cookies van en <code>.env</code>, no aquí.</p>
+          <div class="field" style="max-width:none"><textarea name="headers" rows="5" aria-label="Cabeceras HTTP" placeholder="Accept-Language: es-ES,es;q=0.9">{{ form.headers or '' }}</textarea>{{ err('headers') }}</div>
+        </section>
+        <section data-sec="search">
+          <h3>Personalizado › Búsqueda personalizada</h3>
+          <p class="desc" data-help="custom_search">Busca texto en el código HTML de cada página (sin distinguir mayúsculas). Aparece en la pestaña «Búsqueda personalizada».</p>
+          {% for i in range(max_custom) %}
+          <div class="custom-row">
+            <input type="text" name="search_name_{{ i }}" placeholder="Nombre (p. ej. Teléfono)" value="{{ form['search_name_' ~ i] or '' }}" aria-label="Nombre búsqueda {{ i + 1 }}">
+            <select name="search_mode_{{ i }}" aria-label="Modo búsqueda {{ i + 1 }}">
+              <option value="contains" {% if form['search_mode_' ~ i] != 'not_contains' %}selected{% endif %}>Contiene</option>
+              <option value="not_contains" {% if form['search_mode_' ~ i] == 'not_contains' %}selected{% endif %}>No contiene</option>
+            </select>
+            <input type="text" name="search_text_{{ i }}" placeholder="Texto a buscar (p. ej. 900 123 456)" value="{{ form['search_text_' ~ i] or '' }}" aria-label="Texto búsqueda {{ i + 1 }}">
+          </div>
+          {% endfor %}
+        </section>
+        <section data-sec="extract">
+          <h3>Personalizado › Extracción personalizada</h3>
+          <p class="desc" data-help="custom_extract">Extrae datos de cada página con un selector CSS (texto del elemento, o su content/href/src) o una expresión regular (el primer grupo, si lo hay). Aparece en la pestaña «Extracción personalizada».</p>
+          <div class="picker-bar">
+            <input type="url" id="pick_url" name="pick_url" form="pick-none" placeholder="URL de ejemplo (p. ej. una ficha de producto)" aria-label="URL de ejemplo para elegir el dato">
+            <button type="button" class="mini" data-click="openPicker">Elegir el dato con el ratón</button>
+            <span class="muted">Abre una copia de la página: haz clic en el precio, el autor, el stock… y se rellena la extracción.</span>
+          </div>
+          {% for i in range(max_custom) %}
+          <div class="custom-row">
+            <input type="text" name="extract_name_{{ i }}" placeholder="Nombre (p. ej. Precio)" value="{{ form['extract_name_' ~ i] or '' }}" aria-label="Nombre extracción {{ i + 1 }}">
+            <select name="extract_type_{{ i }}" aria-label="Tipo extracción {{ i + 1 }}">
+              <option value="css" {% if form['extract_type_' ~ i] not in ('regex', 'xpath') %}selected{% endif %}>Selector CSS</option>
+              <option value="xpath" {% if form['extract_type_' ~ i] == 'xpath' %}selected{% endif %}>XPath</option>
+              <option value="regex" {% if form['extract_type_' ~ i] == 'regex' %}selected{% endif %}>Regex</option>
+            </select>
+            <input type="text" name="extract_expr_{{ i }}" placeholder="p. ej. .precio, a[href^='tel:'] o tel:(\+?\d+)" value="{{ form['extract_expr_' ~ i] or '' }}" aria-label="Expresión extracción {{ i + 1 }}">
+          </div>
+          {{ err('extract_expr_' ~ i) }}
+          {% endfor %}
+        </section>
+        <section data-sec="auth">
+          <h3>Autenticación</h3>
+          <p class="desc">Las credenciales se guardan solo en <code>.env</code>, se envían solo a tu sitio y nunca a la base de datos.</p>
+          <h4>Grabar tu inicio de sesión (SSO, doble factor, CAPTCHA)</h4>
+          <p class="muted" style="margin-top:0">Se abre una ventana de navegador real: inicias sesión tú, como siempre, y pulsas «Guardar sesión». Se guardan solo las cookies y el localStorage de tu sitio en <code>data/sessions/</code> (nunca en la base de datos ni en las exportaciones) y los próximos rastreos de ese sitio entran ya identificados hasta que la sesión caduque.</p>
+          {{ chk('use_saved_session', 'Usar la sesión grabada de este sitio si existe') }}
+          {% with rec=session_status, saved=saved_sessions %}{% include "_session.html" %}{% endwith %}
+          <p><strong>Autenticación HTTP básica:</strong> <code>CRAWL_AUTH_USER</code> y <code>CRAWL_AUTH_PASSWORD</code>.</p>
+          <p><strong>Cookies:</strong> <code>CRAWL_COOKIES</code> {% if cookies_set %}<span class="badge st-completed">configuradas</span>{% endif %}</p>
+          <label class="check"><input type="checkbox" name="form_login" value="yes" {% if not login_available %}disabled{% elif form.form_login %}checked{% endif %}>
+            <span>Iniciar sesión con formulario antes de rastrear {% if login_available %}(LOGIN_URL de .env){% else %}<span class="muted">— define LOGIN_URL, LOGIN_USER y LOGIN_PASSWORD en .env</span>{% endif %}</span></label>
+          <p class="muted">Tras cambiar .env reinicia la app.</p>
+        </section>
+      </div>
+      <div class="cfg-foot">
+        <span class="cfg-valid">{% if config_error %}<span class="cv-ico bad" aria-hidden="true">!</span><span class="err">Hay campos por corregir (marcados con •)</span>{% endif %}</span>
+        <button type="submit" class="cfg-link" formaction="/config/reset" formnovalidate
+                data-confirm="¿Volver a la configuración de fábrica?">Restablecer</button>
+        <span class="spacer" style="flex:1"></span>
+        <input type="hidden" name="back" id="cfg-back" value="">
+        <button type="button" class="cfg-cancel" data-click="cancelCfg">Cancelar</button>
+        <button type="button" class="cfg-cancel" data-click="closeCfg" title="Los cambios se usan en el próximo rastreo que lances desde aquí, pero no se guardan">Usar solo en el próximo rastreo</button>
+        <button type="submit" class="cfg-ok" formaction="/config" title="Guarda los cambios: todos los rastreos empezarán con esta configuración">Guardar</button>
+      </div>
+    </div>
+  </dialog>
+  <dialog class="picker" id="picker">
+    <div class="picker-head">
+      <strong>Elige el dato</strong> <span class="muted" id="pick-src"></span>
+      <span style="flex:1"></span><button type="button" class="secondary mini" data-click="closeDialog" data-args='["$this"]' aria-label="Cerrar">Cerrar</button>
+    </div>
+    <div class="picker-body">
+      <iframe id="pick-frame" sandbox="allow-same-origin" title="Copia de la página sin scripts"></iframe>
+      <aside class="picker-side">
+        <p class="muted" id="pick-help">Pasa el ratón por la página y haz clic en el dato que quieres extraer. Los enlaces no navegan.</p>
+        <div id="pick-result" hidden>
+          <div class="field" style="max-width:none"><label for="pick-name" data-help="pick_name">Nombre de la columna</label><input id="pick-name" type="text" placeholder="Precio"></div>
+          <div class="field" style="max-width:none"><label for="pick-what" data-help="pick_what">Qué extraer</label><select id="pick-what"></select></div>
+          <div class="field" style="max-width:none"><label for="pick-scope" data-help="pick_scope">Alcance</label>
+            <select id="pick-scope"><option value="one">Solo este elemento</option><option value="all">Todos los elementos parecidos</option></select></div>
+          <div class="field" style="max-width:none"><label for="pick-expr" data-help="pick_expr">Selector generado</label><input id="pick-expr" type="text"><small class="muted" id="pick-type"></small></div>
+          <p><strong>Vista previa</strong> <span class="muted" id="pick-count"></span></p>
+          <ol id="pick-preview" class="pick-preview"></ol>
+          <button type="button" class="mini" data-click="usePick">Añadir como extracción</button>
+          <p class="muted" id="pick-msg"></p>
+        </div>
+      </aside>
+    </div>
+  </dialog>
+</form>
+
+<div class="start">
+  <div class="start-in">
+    <h1 class="start-h">¿Qué quieres revisar?</h1>
+    <p class="start-sub">Escribe la dirección de la web en la barra de arriba, confirma que tienes permiso y elige una opción. En unos minutos sabrás qué arreglar primero.</p>
+    <div class="quick-grid">
+      <button type="button" class="qa qa-main" data-click="quickAudit" data-args='["full"]'><b>Auditoría completa</b><small>Todo: títulos, enlaces, imágenes, velocidad y qué arreglar primero.</small></button>
+      <button type="button" class="qa" data-click="quickAudit" data-args='["broken"]'><b>Solo enlaces rotos</b><small>Enlaces que dan error 404 o 500 y en qué página están.</small></button>
+      <button type="button" class="qa" data-click="quickAudit" data-args='["images"]'><b>Solo imágenes pesadas</b><small>Imágenes que hacen lenta la web.</small></button>
+      <button type="button" class="qa" data-click="quickAudit" data-args='["sitemap"]'><b>Solo el sitemap</b><small>Qué URLs del sitemap responden bien y cuáles no.</small></button>
+    </div>
+    <p class="quick-msg" id="quick-msg" role="status"></p>
+    {% if crawls %}
+    <section class="start-recent">
+      <div class="start-recent-h"><h2>Tus últimas auditorías</h2>{% if crawls|length > 5 %}<a href="#" data-click="openDlg" data-args='["saved-dlg"]'>Ver todas</a>{% endif %}</div>
+      <ul>{% for c in crawls[:5] %}
+        <li><a href="/crawls/{{ c.id }}"><span class="sr-url">{{ c.start_url | replace('https://', '') | replace('http://', '') | trim('/') }}</span>
+          <span class="sr-meta"><span class="badge st-{{ c.status }}">{{ status_label[c.status] }}</span> <span>{{ c.pages_done }} URLs</span> <span>{{ c.created_at[:10] }}</span></span></a></li>
+      {% endfor %}</ul>
+    </section>
+    {% endif %}
+  </div>
+</div>
+<dialog class="note-dlg" id="saved-dlg" style="width:min(900px, calc(100vw - 32px))">
+  <div style="display:flex; align-items:center"><h3 style="margin:0">Auditorías guardadas</h3><span style="flex:1"></span>
+    <button type="button" class="secondary mini" data-click="closeDialog" data-args='["$this"]' aria-label="Cerrar">Cerrar</button></div>
+<div class="card">
+{% if crawls %}
+  <div class="table-wrap"><table>
+    <thead><tr><th>Sitio</th><th>Estado</th><th>URLs</th><th>Fecha (UTC)</th><th></th></tr></thead>
+    <tbody>
+    {% for c in crawls %}
+      <tr>
+        <td class="url">{{ c.start_url }}{% if c.settings.mode == 'list' %} <span class="badge sev-info">lista</span>{% endif %}</td>
+        <td><span class="badge st-{{ c.status }}">{{ status_label[c.status] }}</span></td>
+        <td>{{ c.pages_done }}</td>
+        <td>{{ c.created_at[:16].replace('T', ' ') }}</td>
+        <td><a href="/crawls/{{ c.id }}">Ver</a></td>
+      </tr>
+    {% endfor %}
+    </tbody>
+  </table></div>
+{% else %}
+  <div class="empty">Aún no hay auditorías. Introduce la URL de un sitio tuyo arriba para empezar.</div>
+{% endif %}
+</div>
+
+  <p class="muted" style="margin:8px 0 0">Datos en <code>{{ data_dir }}</code></p>
+</dialog>
+<dialog class="note-dlg" id="open-dlg" style="width:min(640px, calc(100vw - 32px))">
+  <div style="display:flex; align-items:center"><h3 style="margin:0">Abrir un archivo de rastreo</h3><span style="flex:1"></span>
+    <button type="button" class="secondary mini" data-click="closeDialog" data-args='["$this"]' aria-label="Cerrar">Cerrar</button></div>
+<form class="card row" method="post" action="/import" enctype="multipart/form-data">
+  <strong>Abrir un archivo de rastreo (.seocrawl)</strong>
+  <input type="file" name="file" accept=".seocrawl,application/gzip" required aria-label="Archivo .seocrawl">
+  <button class="secondary mini" type="submit">Importar</button>
+  <span class="muted">Exportado desde otro equipo con «Exportar › Archivo de rastreo». Si estaba en pausa, podrás reanudarlo aquí.</span>
+</form>
+</dialog>
+<script src="/static/picker.js?v={{ static_v }}"></script>
+<script type="application/json" id="page-data">{{ {"firstSec": first_error[0] if first_error else "crawl", "openCfg": config_error} | tojson }}</script>
+<script src="/static/index.js?v={{ static_v }}"></script>
+{% endblock %}

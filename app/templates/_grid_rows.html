@@ -1,0 +1,17 @@
+{# Table rows; the last row asks for the next chunk when it scrolls into view (infinite scroll). #}
+      {% for r in rows %}
+        <tr hx-get="/crawls/{{ crawl.id }}/detail?src={{ tab.source }}&url={{ quote(r.address, safe='') }}" hx-target="#detail" hx-swap="innerHTML" data-click="selRow" data-args='["$this", "$event"]'
+            data-url="{{ r.address }}" {% if tab.source == 'pages' %}data-notes="1"{% endif %} class="{{ 'has-note' if r.note_status }}">
+          <td class="n">{% if jn and jn.url[r.address] %}<span class="row-note" title="Tiene notas">•</span>{% endif %}{{ start + loop.index }}</td>
+          {% for key, label in tab.columns %}
+            {% set v = cell(r, key) %}
+            {% if key == 'status_code' %}<td class="c{{ (v // 100) if v != '' else 0 }}">{{ v }}</td>
+            {% elif v is number %}<td class="n">{{ v }}</td>
+            {% else %}<td title="{{ v }}">{{ v }}</td>{% endif %}
+          {% endfor %}
+        </tr>
+      {% endfor %}
+      {% if next_start %}
+        <tr class="more-row" hx-get="/crawls/{{ crawl.id }}/grid?tab={{ tab.key }}&f={{ f }}&q={{ quote(q or '') }}&sort={{ sort }}&dir={{ dir }}&start={{ next_start }}&more=1"
+            hx-trigger="intersect once" hx-swap="outerHTML"><td colspan="{{ tab.columns|length + 1 }}"><span class="spinner"></span> Cargando más filas…</td></tr>
+      {% endif %}

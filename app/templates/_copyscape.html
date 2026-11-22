@@ -1,0 +1,7 @@
+{% if error %}<div class="alert error">{{ error }}</div>
+{% elif not results %}<div class="alert ok">Copyscape no encontró copias de {{ url }}.</div>
+{% else %}
+  <table class="dg" style="width:100%"><thead><tr><th>Copia encontrada</th><th>Palabras coincidentes</th><th>Fragmento</th></tr></thead><tbody>
+  {% for r in results %}<tr><td title="{{ r.url }}"><a href="{{ r.url }}" target="_blank" rel="noopener noreferrer">{{ r.title or r.url }}</a></td><td class="n">{{ r.words }}</td><td title="{{ r.snippet }}">{{ r.snippet }}</td></tr>{% endfor %}
+  </tbody></table>
+{% endif %}

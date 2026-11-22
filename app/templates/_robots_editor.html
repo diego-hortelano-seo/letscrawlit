@@ -1,0 +1,4 @@
+<div id="robots-editor">
+  {% if message %}<p class="muted" role="status">{{ message }}</p>{% endif %}
+  <textarea id="custom_robots" name="custom_robots" rows="8" placeholder="User-agent: *&#10;Disallow: /wp-admin/&#10;Allow: /wp-admin/admin-ajax.php&#10;Disallow: /*?s=">{{ text }}</textarea>
+</div>

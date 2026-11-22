@@ -1,0 +1,41 @@
+{# «Configurar IA»: pick a provider, paste the key, done. Saved into the local .env (never committed). #}
+<div id="ai-setup" class="ai-setup">
+  {% if message %}<div class="alert {{ 'ok' if ok else 'error' }}" role="status">{{ message }}</div>{% endif %}
+  {% if ai.enabled %}<p class="ai-now"><span class="api-state on">IA activa</span> · {{ providers[ai.provider].name }} · <code>{{ ai.model }}</code></p>{% endif %}
+  <form hx-post="/ai/setup" hx-target="#ai-setup" hx-swap="outerHTML" autocomplete="off">
+    <p class="ai-step">1. Elige con qué IA trabajar</p>
+    <div class="ai-prov">
+      {% for k, p in providers.items() %}
+      <label class="ai-card"><input type="radio" name="provider" value="{{ k }}" {% if k == current %}checked{% endif %} data-change="aiPick" data-args='["$this"]'>
+        <span class="ai-logo" style="background:{{ p.color }}">{{ p.icon }}</span>
+        <span><strong>{{ p.name }}</strong><br><span class="muted">{{ p.blurb }}</span></span></label>
+      {% endfor %}
+    </div>
+    {% for k, p in providers.items() %}
+    <div class="ai-fields" data-prov="{{ k }}" {% if k != current %}hidden{% endif %}>
+      {% if p.key_var %}
+      <p class="ai-step">2. Pega tu clave de la API</p>
+      <div class="field" style="max-width:none">
+        <input type="password" name="key_{{ k }}" placeholder="{{ ('Guardada ' ~ p.saved ~ ' · déjalo vacío para mantenerla') if p.saved else p.key_hint }}" aria-label="Clave de la API de {{ p.name }}" spellcheck="false">
+        <span class="muted ai-help"><span>Consigue tu clave en</span> <a href="{{ p.key_url }}" target="_blank" rel="noopener">{{ p.key_url.split('://')[1] }}</a>{% if k == 'gemini' %} <span>(gratis con tu cuenta de Google)</span>{% elif k == 'groq' %} <span>(gratis, sin tarjeta)</span>{% endif %}{% if k == 'anthropic' %} · o deja el campo vacío si ya iniciaste sesión con <code>ant auth login</code>{% endif %}</span>
+      </div>
+      {% else %}
+      <p class="ai-step">2. Dirección de Ollama</p>
+      <div class="field" style="max-width:none"><input type="text" name="ollama_url" value="{{ ollama_url }}" aria-label="Dirección de Ollama">
+        <span class="muted ai-help"><a href="https://ollama.com/download" target="_blank" rel="noopener">Instala Ollama</a> y descarga un modelo, por ejemplo <code>ollama pull llama3.1</code>.</span></div>
+      {% endif %}
+      <p class="ai-step">3. Modelo <span class="muted">(opcional)</span></p>
+      <div class="field" style="max-width:none">
+        <input type="text" name="model_{{ k }}" list="ai-models-{{ k }}" value="{{ model if k == saved_provider else '' }}" placeholder="Por defecto: {{ p.default }}" aria-label="Modelo de {{ p.name }}" spellcheck="false">
+        <datalist id="ai-models-{{ k }}">{% for m in p.models %}<option value="{{ m }}">{% endfor %}</datalist>
+      </div>
+      <p class="muted ai-help">{{ p.privacy }}</p>
+    </div>
+    {% endfor %}
+    <div class="ai-actions">
+      <button type="submit" class="mini">Guardar y activar</button>
+      {% if ai.enabled %}<button type="button" class="secondary mini" hx-post="/ai/setup/test" hx-target="#ai-setup" hx-swap="outerHTML">Probar la conexión</button>{% endif %}
+      <span class="muted ai-help">Se guarda solo en el archivo <code>.env</code> de tu equipo; la clave no se muestra ni se sube a GitHub.</span>
+    </div>
+  </form>
+</div>

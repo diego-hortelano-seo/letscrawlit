@@ -1,0 +1,41 @@
+{# Consultor con IA: conversation box, loaded into #consult-slot by openConsult(). `url` = the page being asked about. #}
+{% set cq = '/consultor?crawl=' ~ (crawl.id if crawl else 0) %}
+<div id="consult-box" class="consult">
+  {% if not ai.enabled %}
+    <div class="alert error" role="status">{{ ai.reason }}</div>
+    <p><button type="button" class="mini" data-click="openAiSetup">Configurar la IA</button></p>
+  {% else %}
+    <p class="muted consult-note">{% if crawl %}<span>Ve los datos de esta auditoría:</span> <span>{{ crawl.start_url }}</span>{% else %}<span>No hay ninguna auditoría abierta: responde de forma general.</span>{% endif %}
+      · <code>{{ ai.model }}</code></p>
+  {% endif %}
+  {% if url %}
+    <p class="consult-chip"><span>Hablando de esta página:</span> <span class="url" title="{{ url }}">{{ url }}</span>
+      <button type="button" class="chip-x" hx-get="{{ cq }}" hx-target="#consult-box" hx-swap="outerHTML" title="Hablar de la web en general" aria-label="Hablar de la web en general">Quitar</button></p>
+  {% endif %}
+  <div class="consult-log" id="consult-log" aria-live="polite">
+    {% if not msgs %}
+      <div class="cmsg assistant"><p>{% if crawl %}Hola, soy tu consultor SEO. Te explico por encima lo que necesites o te ayudo con lo que me pidas sobre esta auditoría.{% else %}Hola, soy tu consultor SEO. Te explico por encima lo que necesites o te ayudo con lo que me pidas.{% endif %}</p></div>
+    {% endif %}
+    {% for m in msgs %}
+      <div class="cmsg {{ m.role }}">{% if m.role == 'assistant' %}{{ m.html | safe }}{% else %}{% if m.url %}<span class="cmsg-url">{{ m.url }}</span>{% endif %}<p>{{ m.content }}</p>{% endif %}</div>
+    {% endfor %}
+    {% if error %}<div class="alert error" role="alert">{{ error }}</div>{% endif %}
+    {% if ai.enabled and (url or not msgs) %}<div class="consult-sugg">
+      {% for s in (['¿Qué le pasa a esta página?', '¿Cómo la mejoro?', 'Propón title y meta description'] if url
+                   else ['¿Qué debería arreglar primero?', 'Explícame por encima cómo está la web', '¿Qué significan los errores más graves?'] if crawl
+                   else ['¿Qué es el SEO técnico?', '¿Qué es una etiqueta canonical?', '¿Cómo uso LetsCrawlit para auditar mi web?']) %}
+        <button type="button" class="secondary mini consult-s" hx-post="{{ cq }}" hx-include="#consult-url"
+                hx-target="#consult-box" hx-swap="outerHTML" hx-indicator="#consult-box">{{ s }}</button>
+      {% endfor %}</div>{% endif %}
+    <div class="cmsg assistant consult-wait"><p>Pensando…</p></div>
+  </div>
+  {% if ai.enabled %}
+  <form id="consult-form" class="consult-form" hx-post="{{ cq }}" hx-target="#consult-box" hx-swap="outerHTML" hx-indicator="#consult-box">
+    <input type="hidden" id="consult-url" name="url" value="{{ url }}">
+    <textarea name="q" rows="2" maxlength="4000" required placeholder="{{ 'Pregunta lo que quieras sobre esta página… (Intro para enviar)' if url else 'Pregunta lo que quieras… (Intro para enviar, Mayús+Intro para nueva línea)' }}" aria-label="Tu pregunta"></textarea>
+    <button type="submit">Enviar</button>
+  </form>
+  {% if msgs %}<p class="consult-foot"><button type="button" class="cfg-link" hx-post="/consultor/clear?crawl={{ crawl.id if crawl else 0 }}&url={{ url | urlencode }}" hx-target="#consult-box" hx-swap="outerHTML">Empezar otra conversación</button>
+    <span class="muted">{{ 'De esta página se envían a la IA sus datos del rastreo y un extracto de su texto.' if url else 'Se envía a la IA un resumen de la auditoría (totales y errores), no el contenido de las páginas.' }}</span></p>{% endif %}
+  {% endif %}
+</div>

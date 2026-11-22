@@ -1,0 +1,23 @@
+{# «Apuntar»: a note about the URLs selected in the table. Just a text; the chips add common lines to it. #}
+<form id="apuntar-form" hx-post="/crawls/{{ crawl.id }}/journal" hx-swap="none">
+  <input type="hidden" name="urls" value="{{ sel_urls | join('\n') }}">
+  <h3 class="ap-h">Nota para {{ sel_urls|length }} URL{{ 's' if sel_urls|length != 1 }}</h3>
+  <div class="ap-urls">{% for u in sel_urls[:3] %}<span class="jn-chip" title="{{ u }}">{{ u | replace('https://', '') | replace('http://', '') }}</span>{% endfor %}
+    {% if sel_urls|length > 3 %}<span class="jn-chip" title="{{ sel_urls[3:] | join(', ') }}">+{{ sel_urls|length - 3 }} más</span>{% endif %}</div>
+  <textarea name="text" id="ap-text" rows="5" maxlength="4000" required aria-label="Nota"
+            placeholder="Escribe lo que quieras: qué hay que cambiar, qué te dijo el cliente…">{{ draft }}</textarea>
+  {% if sel_issues or quick %}
+  <p class="ap-tip muted">O toca para añadirlo a la nota:</p>
+  <div class="jn-picks">
+    {% for g in sel_issues[:8] %}
+    <button type="button" class="jn-pick sev-{{ g.sev }}" data-click="apuntarAdd" data-args='{{ [g.title ~ ((": " ~ g.fix) if g.fix else "")] | tojson }}'
+            title="{{ g.fix or g.title }}">{{ g.title }}{% if sel_urls|length > 1 %} <b>{{ g.count }}/{{ sel_urls|length }}</b>{% endif %}</button>
+    {% endfor %}
+    {% for q in quick %}<button type="button" class="jn-pick" data-click="apuntarAdd" data-args='{{ [q] | tojson }}'>{{ q }}</button>{% endfor %}
+  </div>
+  {% endif %}
+  <div class="ap-actions">
+    <button type="button" class="secondary" data-click="closeDialog" data-args='["$this"]'>Cancelar</button>
+    <button type="submit">Guardar nota</button>
+  </div>
+</form>

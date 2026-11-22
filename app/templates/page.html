@@ -1,0 +1,50 @@
+{% extends "base.html" %}
+{% block title %}{{ p.url }} · LetsCrawlit{% endblock %}
+{% block content %}
+<p><a href="/crawls/{{ crawl.id }}">Volver a la auditoría · {{ crawl.start_url }}</a></p>
+<h1>{{ p.url }}</h1>
+<div class="card">
+  <div class="table-wrap"><table>
+    <tr><th>Estado</th><td>{% if p.blocked_by_robots %}Bloqueada por robots.txt{% else %}{{ p.status_code or 'sin respuesta' }} {{ p.error or '' }}{% endif %}</td></tr>
+    <tr><th>Indexabilidad</th><td>{{ p.indexability }}</td></tr>
+    {% if p.redirect_target %}<tr><th>Redirige a</th><td class="url">{{ p.redirect_target }}</td></tr>{% endif %}
+    <tr><th>Tipo</th><td>{{ p.content_type or '–' }} · {{ p.size_bytes or 0 }} bytes · {{ p.response_ms or '–' }} ms · profundidad {{ p.depth if p.depth is not none else '– (sitemap)' }}</td></tr>
+    <tr><th>Título</th><td>{{ p.title or '–' }}{% if p.title %} <span class="muted">({{ p.title|length }})</span>{% endif %}</td></tr>
+    <tr><th>Meta descripción</th><td>{{ p.meta_description or '–' }}{% if p.meta_description %} <span class="muted">({{ p.meta_description|length }})</span>{% endif %}</td></tr>
+    <tr><th>Canonical</th><td class="url">{{ p.canonical or '–' }}</td></tr>
+    <tr><th>Meta robots / X-Robots-Tag</th><td>{{ p.meta_robots or '–' }} / {{ p.x_robots or '–' }}</td></tr>
+    <tr><th>H1</th><td>{{ p.h1 | join(' | ') or '–' }}</td></tr>
+    <tr><th>H2</th><td>{{ p.h2[:15] | join(' | ') or '–' }}</td></tr>
+    <tr><th>Idioma</th><td>{{ p.lang or '–' }}</td></tr>
+    <tr><th>Datos estructurados</th><td>JSON-LD: {{ (p.structured.jsonld_types or []) | join(', ') or '–' }}{% if p.jsonld_invalid %} <span class="badge sev-medium">{{ p.jsonld_invalid }} inválido(s)</span>{% endif %} · Microdatos: {{ (p.structured.microdata or []) | join(', ') or '–' }}</td></tr>
+    <tr><th>Palabras</th><td>HTML {{ p.word_count if p.word_count is not none else '–' }} · renderizado {{ p.rendered_word_count if p.rendered_word_count is not none else '–' }}</td></tr>
+    {% if p.rendered %}<tr><th>Renderizado</th><td>título «{{ p.rendered_title or '–' }}» · robots {{ p.rendered_robots or '–' }} · canonical {{ p.rendered_canonical or '–' }}</td></tr>{% endif %}
+    {% if p.render_error %}<tr><th>Error de renderizado</th><td>{{ p.render_error }}</td></tr>{% endif %}
+  </table></div>
+</div>
+
+<h2>Incidencias de esta URL ({{ issues|length }})</h2>
+{% if issues %}<div class="card"><table>{% for i in issues %}
+  <tr><td><span class="badge sev-{{ i.severity }}">{{ severity_label[i.severity] }}</span></td><td><strong>{{ i.title }}</strong><br>{% for part, n in i.evidence|evidence_parts %}{{ part }}{% if n > 1 %} <b class="ev-n">×{{ n }}</b>{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}<br><span class="muted">{{ i.remediation }}</span></td></tr>
+{% endfor %}</table></div>{% else %}<div class="card empty">Sin incidencias para esta URL.</div>{% endif %}
+
+{% if p.rendered_text or p.text_excerpt %}
+<h2>Texto {{ 'renderizado' if p.rendered_text else 'del HTML' }}</h2>
+<pre>{{ (p.rendered_text or p.text_excerpt)[:5000] }}</pre>
+{% endif %}
+
+<h2>Enlaces entrantes ({{ inlinks|length }})</h2>
+{% if inlinks %}<div class="card table-wrap"><table><tr><th>Origen</th><th>Ancla</th><th>Tipo</th></tr>
+{% for l in inlinks %}<tr><td class="url"><a href="/crawls/{{ crawl.id }}/page?url={{ quote(l.source_url, safe='') }}">{{ l.source_url }}</a></td><td>{{ l.anchor }}</td><td>{{ l.kind }}{{ ' · nofollow' if l.nofollow }}</td></tr>{% endfor %}
+</table></div>{% else %}<div class="card empty">Ninguna página rastreada enlaza aquí.</div>{% endif %}
+
+<h2>Enlaces salientes ({{ outlinks|length }})</h2>
+{% if outlinks %}<div class="card table-wrap"><table><tr><th>Destino</th><th>Ancla</th><th>Tipo</th></tr>
+{% for l in outlinks %}<tr><td class="url">{{ l.target_url }}</td><td>{{ l.anchor }}</td><td>{{ l.kind }}{{ ' · externo' if not l.internal }}{{ ' · nofollow' if l.nofollow }}</td></tr>{% endfor %}
+</table></div>{% else %}<div class="card empty">Sin enlaces salientes.</div>{% endif %}
+
+<h2>Imágenes ({{ images|length }})</h2>
+{% if images %}<div class="card table-wrap"><table><tr><th>src</th><th>alt</th></tr>
+{% for i in images %}<tr><td class="url">{{ i.src }}</td><td>{% if i.alt is none %}<span class="badge sev-low">falta alt</span>{% elif i.alt == '' %}<span class="muted">(decorativa)</span>{% else %}{{ i.alt }}{% endif %}</td></tr>{% endfor %}
+</table></div>{% else %}<div class="card empty">Sin imágenes.</div>{% endif %}
+{% endblock %}

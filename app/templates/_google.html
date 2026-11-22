@@ -1,0 +1,26 @@
+<div id="google-panel" style="font-size:12.5px">
+  <p style="margin:0 0 6px"><strong>Conectar con Google</strong> <span class="muted">· {{ g.message }}</span></p>
+  {% if g.state == 'unconfigured' %}
+    <p class="muted" style="margin:0">Crea en Google Cloud un cliente OAuth de tipo «App de escritorio», activa las APIs de Search Console, Analytics Data y Analytics Admin y pon GOOGLE_CLIENT_ID y GOOGLE_CLIENT_SECRET en el archivo .env. Mientras tanto puedes importar el CSV de arriba.</p>
+  {% elif g.state == 'disconnected' %}
+    <a class="btn mini" href="/integrations/google/connect?back=/crawls/{{ crawl.id }}">Conectar cuenta de Google</a>
+    <p class="muted" style="margin:6px 0 0">Permiso de solo lectura. El token se guarda solo en <code>data/google_token.json</code>.</p>
+  {% else %}
+    {% if error %}<p class="err" style="margin:0 0 6px">{{ error }}</p>{% endif %}
+    <form method="post" action="/crawls/{{ crawl.id }}/google/gsc" style="margin:0 0 8px">
+      <label>Search Console<select name="site" required style="width:100%">
+        {% for s in sites %}<option value="{{ s }}" {% if s == best_site %}selected{% endif %}>{{ s }}</option>{% else %}<option value="">(sin propiedades)</option>{% endfor %}
+      </select></label>
+      <label>Días <input type="number" name="days" value="28" min="1" max="480" style="width:70px"></label>
+      <button class="mini" type="submit" {% if not sites %}disabled{% endif %}>Importar clics e impresiones</button>
+    </form>
+    <form method="post" action="/crawls/{{ crawl.id }}/google/ga4" style="margin:0 0 8px">
+      <label>Analytics 4<select name="property" required style="width:100%">
+        {% for p in props %}<option value="{{ p.id }}">{{ p.name }}</option>{% else %}<option value="">(sin propiedades)</option>{% endfor %}
+      </select></label>
+      <label>Días <input type="number" name="days" value="28" min="1" max="480" style="width:70px"></label>
+      <button class="mini" type="submit" {% if not props %}disabled{% endif %}>Importar sesiones y eventos clave</button>
+    </form>
+    <form method="post" action="/integrations/google/disconnect?back=/crawls/{{ crawl.id }}"><button class="secondary mini" type="submit">Desconectar Google</button></form>
+  {% endif %}
+</div>

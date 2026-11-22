@@ -1,0 +1,5 @@
+{% extends "base.html" %}
+{% block content %}
+{% if crawl %}<p><a href="/crawls/{{ crawl.id }}">Volver a la auditoría</a></p>{% endif %}
+{% include partial %}
+{% endblock %}

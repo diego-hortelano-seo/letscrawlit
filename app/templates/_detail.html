@@ -1,0 +1,152 @@
+{% macro kvval(label, v) %}{% if label in ('URL', 'Redirige a', 'Canonical', 'Canonical renderizado') and (v ~ '').startswith(('http://', 'https://')) %}<a href="{{ v }}" target="_blank" rel="noopener noreferrer" title="Abrir en una pestaña nueva">{{ v }}</a>{% else %}{{ v }}{% endif %}{% endmacro %}
+<nav class="tabbar">
+  <a href="#" class="jn-apuntar" data-click="journalForUrl" data-args='{{ [url] | tojson }}'
+     title="Escribir una nota sobre esta URL">Apuntar</a>
+  {% for key, label in subtabs %}
+    <a class="{{ 'on' if key == sub }}" hx-get="/crawls/{{ crawl.id }}/detail?src={{ src }}&sub={{ key }}&url={{ quote(url, safe='') }}"
+       hx-target="#detail" hx-swap="innerHTML">{{ label }}{% if key == 'inlinks' and inlinks is defined %} ({{ inlinks|length }}){% elif key == 'outlinks' %} ({{ outlinks|length }}){% elif key == 'issues' %} ({{ issues|length }}){% elif key == 'images' and images is defined %} ({{ images|length }}){% endif %}</a>
+  {% endfor %}
+  <a href="{{ url }}" target="_blank" rel="noopener noreferrer" style="margin-left:auto" title="Abrir la URL en una pestaña nueva">Abrir</a>
+</nav>
+{% if row and row.note %}<div class="note-banner"><strong>{{ row.note_status | capitalize }}</strong> · {{ row.note }} <span class="muted">({{ row.note_updated }})</span></div>{% endif %}
+{% if url_journal %}<div class="note-banner jn-banner"><strong>{{ url_journal|length }} nota(s) sobre esta URL</strong> ·
+  {% for e in url_journal[:3] %}<span class="jn-snip">{{ e.text | truncate(90) }}</span>{% if not loop.last %} · {% endif %}{% endfor %}
+  <a href="#" data-click="toggleJournal">Ver notas</a></div>{% endif %}
+<div class="detail-body">
+{% set r = row %}
+{% if sub == 'details' %}
+  <table class="kv dg kv-pick" style="width:100%">
+  {% if src == 'pages' %}
+    {% for label, v in [
+      ('URL', r.address), ('Código de estado', r.status_code), ('Estado', r.status_text),
+      ('Indexabilidad', r.indexable_label ~ ' · ' ~ r.indexability), ('Redirige a', r.redirect_target),
+      ('Tipo de contenido', r.content_type), ('Tamaño (bytes)', r.size_bytes), ('Tiempo de respuesta (ms)', r.response_ms),
+      ('Profundidad (clics desde la inicial)', r.depth), ('Descubierta por', r.source),
+      ('Título 1', r.title), ('Longitud / píxeles del título', (r.title_len ~ ' car. · ' ~ r.title_px ~ ' px') if r.title else ''),
+      ('Meta descripción 1', r.meta_description), ('Longitud / píxeles de la descripción', (r.desc_len ~ ' car. · ' ~ r.desc_px ~ ' px') if r.meta_description else ''),
+      ('H1', (r.h1 or [])|join(' | ')), ('H2', (r.h2 or [])[:10]|join(' | ')),
+      ('Canonical', r.canonical), ('Canonical renderizado', r.rendered_canonical),
+      ('Meta robots', r.meta_robots), ('X-Robots-Tag', r.x_robots), ('Robots renderizado', r.rendered_robots),
+      ('Título renderizado', r.rendered_title), ('Idioma (lang)', r.lang), ('Hreflang', r.hreflang_langs),
+      ('JSON-LD', r.jsonld_types), ('Microdatos', r.microdata), ('JSON-LD no válidos', r.jsonld_invalid),
+      ('Palabras HTML / renderizado', (r.word_count if r.word_count is not none else '–') ~ ' / ' ~ (r.rendered_word_count if r.rendered_word_count is not none else '–')),
+      ('Inlinks / únicos', r.inlinks ~ ' / ' ~ r.unique_inlinks), ('Outlinks internos / externos', r.outlinks ~ ' / ' ~ (r.external_outlinks if r.external_outlinks is not none else 'no guardados')),
+      ('Recursos HTTP (contenido mixto)', (r.mixed or [])|join(', ')), ('Error', r.error), ('Error de renderizado', r.render_error),
+      ('Rastreada', r.fetched_at)] %}
+      {% if v not in (none, '', []) %}<tr title="Clic para seleccionar · Ctrl+C copia el valor"><th>{{ label }}</th><td style="white-space:normal">{{ kvval(label, v) }}</td></tr>{% endif %}
+    {% endfor %}
+  {% elif src == 'externals' %}
+    {% for label, v in [('URL', r.address), ('Host', r.host), ('Código de estado', r.status_code), ('Estado', r.status_text),
+        ('Tipo de contenido', r.content_type), ('Redirige a', r.redirect_target), ('Tiempo de respuesta (ms)', r.response_ms),
+        ('Inlinks', r.inlinks), ('Error', r.error)] %}
+      {% if v not in (none, '', []) %}<tr title="Clic para seleccionar · Ctrl+C copia el valor"><th>{{ label }}</th><td style="white-space:normal">{{ kvval(label, v) }}</td></tr>{% endif %}
+    {% endfor %}
+  {% else %}
+    <tr><th>URL</th><td style="white-space:normal">{{ r.address }}</td></tr>
+    <tr><th>Texto alt</th><td>{{ r.alt_label }}</td></tr>
+    <tr><th>Páginas que la usan</th><td>{{ r.page_count }} ({{ r.missing_alt }} sin alt)</td></tr>
+  {% endif %}
+  </table>
+{% elif sub == 'inlinks' %}
+  {% if src == 'images' %}
+    <table class="dg"><thead><tr><th>Página</th></tr></thead><tbody>{% for p in image_pages %}<tr><td>{{ p }}</td></tr>{% endfor %}</tbody></table>
+  {% elif inlinks %}
+    <table class="dg"><thead><tr><th>Tipo</th><th>Desde</th><th>Ancla</th><th>Follow</th></tr></thead><tbody>
+    {% for l in inlinks %}<tr><td>{{ l.kind }}</td><td title="{{ l.source_url }}">{{ l.source_url }}</td><td>{{ l.anchor }}</td><td>{{ 'nofollow' if l.nofollow else 'follow' }}</td></tr>{% endfor %}
+    </tbody></table>
+  {% else %}<div class="empty">Ninguna página rastreada enlaza a esta URL.</div>{% endif %}
+{% elif sub == 'outlinks' %}
+  {% if outlinks %}
+    <table class="dg"><thead><tr><th>Tipo</th><th>Hacia</th><th>Código destino</th><th>Ancla</th><th>Interno</th><th>rel</th></tr></thead><tbody>
+    {% for l in outlinks %}<tr><td>{{ l.kind }}</td><td title="{{ l.target_url }}">{{ l.target_url }}</td>
+      <td class="c{{ (l.target_status // 100) if l.target_status else 0 }}">{{ l.target_status if l.target_status else ('sin comprobar' if not l.internal else '–') }}</td>
+      <td>{{ l.anchor }}</td><td>{{ 'sí' if l.internal else 'externo' }}</td><td>{{ l.rel or ('nofollow' if l.nofollow else 'follow') }}</td></tr>{% endfor %}
+    </tbody></table>
+  {% else %}<div class="empty">Sin enlaces salientes.</div>{% endif %}
+{% elif sub == 'images' %}
+  {% if images %}
+    <table class="dg"><thead><tr><th>src</th><th>alt</th></tr></thead><tbody>
+    {% for i in images %}<tr><td title="{{ i.src }}">{{ i.src }}</td><td>{% if i.alt is none %}<span class="badge sev-low">falta alt</span>{% elif i.alt == '' %}<span class="muted">(vacío · decorativa)</span>{% else %}{{ i.alt }}{% endif %}</td></tr>{% endfor %}
+    </tbody></table>
+  {% else %}<div class="empty">Sin imágenes.</div>{% endif %}
+{% elif sub == 'headers' %}
+  {% if r.headers %}
+    <table class="kv dg" style="width:100%">{% for k, v in r.headers.items() %}<tr><th>{{ k }}</th><td style="white-space:normal">{{ v }}</td></tr>{% endfor %}</table>
+  {% else %}<div class="empty">No hay cabeceras guardadas (URL bloqueada, sin respuesta o rastreada con una versión anterior).</div>{% endif %}
+{% elif sub == 'hreflang' %}
+  {% if r.hreflang %}
+    <table class="dg"><thead><tr><th>Idioma</th><th>URL</th></tr></thead><tbody>
+    {% for a in r.hreflang %}<tr><td>{{ a.lang }}</td><td>{{ a.href }}</td></tr>{% endfor %}</tbody></table>
+  {% else %}<div class="empty">Sin anotaciones hreflang.</div>{% endif %}
+{% elif sub == 'path' %}
+  {% if crawl_path %}
+    <table class="dg"><thead><tr><th>Paso</th><th>URL</th><th>Cómo se llega</th><th>Ancla</th></tr></thead><tbody>
+    {% for s in crawl_path %}<tr><td class="n">{{ loop.index0 }}</td><td title="{{ s.url }}">{{ s.url }}</td><td>{{ s.kind }}</td><td>{{ s.anchor }}</td></tr>{% endfor %}
+    </tbody></table>
+    <p class="muted" style="padding:0 10px">Camino más corto desde la URL inicial: {{ crawl_path|length - 1 }} clic(s).</p>
+  {% else %}<div class="empty">No hay un camino de enlaces desde la URL inicial (descubierta por sitemap, lista o canonical): candidata a huérfana.</div>{% endif %}
+{% elif sub == 'serp' %}
+  <div class="serp-tool" style="padding:12px">
+    <div class="row" style="margin-bottom:8px">
+      <label class="check"><input type="radio" name="serp_dev" value="desktop" checked data-change="serpUpdate"> Ordenador (600 px)</label>
+      <label class="check"><input type="radio" name="serp_dev" value="mobile" data-change="serpUpdate"> Móvil (500 px)</label>
+    </div>
+    <div class="field"><label for="serp_title">Título (edítalo para probar)</label><input id="serp_title" type="text" value="{{ r.title }}" data-input="serpUpdate"></div>
+    <div class="field"><label for="serp_desc">Meta descripción</label><textarea id="serp_desc" rows="3" data-input="serpUpdate" style="width:100%">{{ r.meta_description }}</textarea></div>
+    <div class="serp" id="serp_box">
+      <div class="serp-url">{{ r.url.split('://')[-1].split('/')[0] }} › {{ '/'.join(r.url.split('://')[-1].split('/')[1:])[:50] }}</div>
+      <div class="serp-title" id="serp_t"></div>
+      <div class="serp-desc" id="serp_d"></div>
+    </div>
+    <p class="muted" id="serp_info"></p>
+  </div>
+
+{% elif sub == 'source' %}
+  {% if sources %}{% for label, html in sources %}
+    <details {% if loop.first %}open{% endif %} style="margin:8px 10px"><summary><strong>{{ label }}</strong> <span class="muted">({{ html | length }} caracteres)</span></summary>
+      <pre style="white-space:pre-wrap; max-height:420px; overflow:auto">{{ html }}</pre></details>
+  {% endfor %}
+  {% else %}<div class="empty">No se guardó el HTML de esta página. Activa «Guardar el HTML original» o «Guardar el HTML renderizado» en Configuración › Extracción y vuelve a rastrear.</div>{% endif %}
+{% elif sub == 'screenshot' %}
+  {% if r.screenshot %}<div style="padding:10px"><img src="/crawls/{{ crawl.id }}/screenshot/{{ r.screenshot }}" alt="Captura de {{ r.url }}" style="max-width:100%; border:1px solid var(--border)"></div>
+  {% else %}<div class="empty">Sin captura. {{ screenshot_hint }}</div>{% endif %}
+{% elif sub == 'waterfall' %}
+  <div style="padding:10px">
+    <p class="muted">Carga la página en un navegador real y muestra en qué milisegundo empieza y termina cada recurso (HTML, CSS, JS, imágenes, fuentes). Hace una visita a tu página.</p>
+    <button class="mini" hx-post="/crawls/{{ crawl.id }}/waterfall?url={{ quote(url, safe='') }}" hx-target="#wf" hx-swap="innerHTML" hx-indicator="#wf-ind">Generar cascada</button>
+    <span id="wf-ind" class="htmx-indicator"><span class="spinner"></span> Cargando la página…</span>
+    <div id="wf"></div>
+  </div>
+{% elif sub == 'quality' %}
+  {% set x = r.extra or {} %}
+  <table class="kv dg" style="width:100%">
+    <tr><th>Ortografía</th><td style="white-space:normal">{% if x.spelling %}{% set ws = (r.spelling_words or '').split(', ') if r.spelling_words else [] %}{{ ws|length }} palabra(s) desconocidas ({{ x.spelling.lang }}){% if ws %}. Si alguna es correcta, añádela al diccionario (vale para todo el equipo):<br>{% for w in ws %}<span><button type="button" class="secondary mini" style="margin:2px" hx-post="/dictionary/add" hx-vals='{{ {"word": w} | tojson }}' hx-target="closest span" hx-swap="innerHTML">{{ w }} +</button></span>{% endfor %}{% endif %}{% else %}Sin comprobar (idioma sin diccionario o desactivado){% endif %}</td></tr>
+    <tr><th>Accesibilidad (WCAG básico)</th><td style="white-space:normal">{% if x.a11y %}{% for k, v in x.a11y.items() if v %}{{ k }}: {{ v if v is number else v|join(', ') }}{% if not loop.last %} · {% endif %}{% else %}Sin barreras detectadas{% endfor %}{% else %}–{% endif %}</td></tr>
+    <tr><th>Datos estructurados</th><td style="white-space:normal">{% for p in x.schema_problems or [] %}<span class="badge {{ 'sev-medium' if p.level == 'error' else 'sev-info' }}">{{ 'error' if p.level == 'error' else 'aviso' }}</span> {{ p.message }}<br>{% else %}Sin problemas de validación{% endfor %}</td></tr>
+    <tr><th>AMP</th><td style="white-space:normal">{% if x.amp and x.amp.is_amp %}Página AMP · {{ x.amp.errors|join('; ') or 'sin errores básicos' }}{% elif x.amp and x.amp.amphtml %}Versión AMP: {{ x.amp.amphtml }}{% else %}No es AMP{% endif %}</td></tr>
+    <tr><th>Casi duplicado</th><td>{% if r.near_dup_url %}{{ r.near_dup_pct }} % similar a {{ r.near_dup_url }}{% else %}No{% endif %}</td></tr>
+    <tr><th>Redirección</th><td>{{ r.redirect_type or 'No' }} {{ r.meta_refresh or r.js_redirect or r.redirect_target or '' }}</td></tr>
+  </table>
+{% elif sub == 'ai' %}
+  <div style="padding:10px">
+    {% if not ai_status.enabled %}<div class="alert info">{{ ai_status.reason }} <button type="button" class="mini" data-click="openAiSetup">Configurar la IA…</button></div>
+    {% else %}
+      <p class="muted">{{ ai_status.provider }} · {{ ai_status.model }} — {{ ai_status.note }}</p>
+      <div class="row">{% for key, t in ai_tasks.items() if key != 'custom' %}
+        <button class="secondary mini" hx-post="/crawls/{{ crawl.id }}/ai?url={{ quote(url, safe='') }}&task={{ key }}" hx-target="#ai-out" hx-swap="innerHTML" hx-indicator="#ai-ind">{{ t[0] }}</button>
+      {% endfor %}<span id="ai-ind" class="htmx-indicator"><span class="spinner"></span> Pensando…</span></div>
+    {% endif %}
+    <div id="ai-out">{% with results = ai_results, tasks = ai_tasks, error = None %}{% include "_ai_results.html" %}{% endwith %}</div>
+  </div>
+{% elif sub == 'text' %}
+  {% if r.rendered_text or r.text_excerpt %}<pre>{{ (r.rendered_text or r.text_excerpt)[:8000] }}</pre>
+  {% else %}<div class="empty">Sin texto (no es una página HTML 200).</div>{% endif %}
+{% elif sub == 'issues' %}
+  {% if issues %}
+    <table class="dg"><thead><tr><th>Gravedad</th><th>Incidencia</th><th>Evidencia</th><th>Cómo solucionarlo</th></tr></thead><tbody>
+    {% for i in issues %}<tr><td><span class="badge sev-{{ i.severity }}">{{ severity_label[i.severity] }}</span></td><td>{{ i.title }}</td>
+      <td title="{{ i.evidence }}">{% for part, n in i.evidence|evidence_parts %}{{ part }}{% if n > 1 %} <b class="ev-n">×{{ n }}</b>{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}</td><td title="{{ i.remediation }}">{{ i.remediation }}</td></tr>{% endfor %}
+    </tbody></table>
+  {% else %}<div class="empty">Sin incidencias para esta URL.</div>{% endif %}
+{% endif %}
+</div>

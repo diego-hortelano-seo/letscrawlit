@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Visualización · LetsCrawlit{% endblock %}
+{% block content %}
+<p><a href="/crawls/{{ crawl.id }}">Volver a la auditoría · {{ crawl.start_url }}</a></p>
+<h1>Visualización de la arquitectura</h1>
+<div class="row" style="margin-bottom:10px">
+  <button id="b-force" data-click="show" data-args='["force"]'>Diagrama de fuerza dirigida</button>
+  <button id="b-tree" class="secondary" data-click="show" data-args='["tree"]'>Árbol de rastreo</button>
+  <button id="b-radial" class="secondary" data-click="show" data-args='["radial"]'>Mapa de URLs (inicio en el centro)</button>
+  <span class="muted" id="vinfo">Cargando…</span>
+</div>
+<div class="row muted" style="font-size:12.5px; margin-bottom:8px">
+  <span><i class="dot g-indexable"></i>Indexable</span><span><i class="dot g-nonindexable"></i>No indexable</span>
+  <span><i class="dot g-redirect"></i>Redirección</span><span><i class="dot g-error"></i>Error</span><span><i class="dot g-blocked"></i>Bloqueada</span>
+  <span>· Tamaño = nº de inlinks · Rueda para zoom, arrastra para mover, clic en un nodo para abrirlo</span>
+</div>
+<div class="card" style="padding:0; position:relative">
+  <canvas id="viz" width="1200" height="720" style="width:100%; height:72vh; display:block; cursor:grab" aria-label="Diagrama del sitio"></canvas>
+  <div id="tip" class="viz-tip" hidden></div>
+</div>
+<script type="application/json" id="page-data">{{ {"crawlId": crawl.id} | tojson }}</script>
+<script src="/static/visual.js?v={{ static_v }}"></script>
+{% endblock %}

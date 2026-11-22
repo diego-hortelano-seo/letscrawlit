@@ -1,0 +1,17 @@
+<div id="robots-result">
+{% if not has_text %}
+  <p class="muted">Escribe primero un robots.txt arriba para probarlo.</p>
+{% elif not has_urls %}
+  <p class="muted">Añade al menos una URL para probar.</p>
+{% else %}
+  <p class="muted">Agente usado para elegir el grupo: <code>{{ token }}</code></p>
+  <table class="dg" style="width:100%">
+    <thead><tr><th>URL</th><th>Resultado</th><th>Regla que decide</th></tr></thead>
+    <tbody>{% for r in results %}
+      <tr><td title="{{ r.url }}">{{ r.url }}</td>
+        <td>{% if r.allowed %}<span class="badge st-completed">Permitida</span>{% else %}<span class="badge sev-critical">Bloqueada</span>{% endif %}</td>
+        <td>{{ r.rule }}</td></tr>
+    {% endfor %}</tbody>
+  </table>
+{% endif %}
+</div>

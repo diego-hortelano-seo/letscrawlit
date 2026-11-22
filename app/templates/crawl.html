@@ -1,0 +1,98 @@
+{% extends "base.html" %}
+{% block title %}{{ crawl.start_url }} · LetsCrawlit{% endblock %}
+{% block body_class %}app{% endblock %}
+{% block main_class %}wb-main{% endblock %}
+{% block header %}
+{% include "_menubar.html" %}
+{% if request.query_params.get('cfg_saved') %}<div class="cfg-saved-note" role="status">Configuración guardada. Se usará en los próximos rastreos.</div>{% endif %}
+<div class="urlbar">
+  <a class="ub-brand" href="/" title="Nueva auditoría"><span class="brand-pill">Lets</span>Crawlit</a>
+  <div class="ub-url" title="{{ crawl.start_url }}">
+    <input type="text" value="{{ crawl.start_url }}{% if crawl.settings.mode == 'list' and (crawl.settings.urls or [])|length > 1 %} (+{{ crawl.settings.urls|length - 1 }} URLs){% endif %}" readonly aria-label="URL rastreada"></div>
+  <span class="ub-mode">{{ 'Lista' if crawl.settings.mode == 'list' else ('Subdominios incluidos' if crawl.settings.crawl_subdomains else 'Sitio web') }}</span>
+  {% if crawl.status in ('queued', 'running') %}
+    <form method="post" action="/crawls/{{ crawl.id }}/pause"><button class="ub-btn" type="submit">Pausar</button></form>
+    <form method="post" action="/crawls/{{ crawl.id }}/cancel"><button class="ub-btn ghost" type="submit">Detener</button></form>
+  {% elif crawl.state_json and crawl.status in ('paused', 'interrupted', 'cancelled') %}
+    <form method="post" action="/crawls/{{ crawl.id }}/resume"><button class="ub-btn" type="submit">Reanudar</button></form>
+    <form method="post" action="/crawls/{{ crawl.id }}/rerun"><button class="ub-btn ghost" type="submit" title="Empezar de nuevo con la misma configuración">Rastrear de nuevo</button></form>
+  {% else %}
+    <form method="post" action="/crawls/{{ crawl.id }}/rerun"><button class="ub-btn" type="submit" title="Volver a rastrear con la misma configuración">Rastrear</button></form>
+  {% endif %}
+  <a class="ub-btn ghost" href="/" title="Nueva auditoría con otra URL">Vaciar</a>
+  <div class="ub-progress">{% include "_status.html" %}</div>
+</div>
+<aside class="journal" id="journal" hidden aria-label="Notas">
+  <div class="jn-top"><strong>Notas de esta web</strong><span style="flex:1"></span>
+    <button type="button" class="secondary mini" data-click="toggleJournal" aria-label="Cerrar las notas">Cerrar</button></div>
+  <div id="journal-slot"><span class="spinner"></span></div>
+</aside>
+<dialog class="note-dlg ap-dlg" id="apuntar-dlg" aria-label="Apuntar"><div id="apuntar-slot"><span class="spinner"></span></div></dialog>
+<dialog class="note-dlg ap-dlg" id="download-dlg" aria-label="Descargar el resumen">
+  <form method="get" id="download-form" action="/crawls/{{ crawl.id }}/client-report/pdf" data-submit="downloadGo">
+    <input type="hidden" name="summary" value="1" id="dl-summary">
+    <h3 class="ap-h" id="dl-title">Descargar el resumen en PDF</h3>
+    <label class="ap-lbl" for="dl-comment">¿Quieres añadir un comentario para el cliente? <span class="muted">(opcional)</span></label>
+    <textarea name="comment" id="dl-comment" rows="4" maxlength="3000" placeholder="Por ejemplo: «Hola Ana, te paso la revisión. Lo más urgente es…»"></textarea>
+    <label class="check ap-notes" id="dl-notes-row"><input type="checkbox" name="notes" value="1" id="dl-notes"> <span>Incluir mis notas de URLs (<span id="dl-notes-n">0</span>)</span></label>
+    <div class="ap-actions">
+      <button type="button" class="secondary" data-click="closeDialog" data-args='["$this"]'>Cancelar</button>
+      <button type="submit">Descargar PDF</button>
+    </div>
+  </form>
+</dialog>
+<dialog class="note-dlg" id="import-dlg" style="width:min(560px, calc(100vw - 32px))">
+  <div style="display:flex; align-items:center"><h3 style="margin:0">Importar datos de Search Console / Analytics</h3><span style="flex:1"></span>
+    <button type="button" class="secondary mini" data-click="closeDialog" data-args='["$this"]' aria-label="Cerrar">Cerrar</button></div>
+  <form method="post" action="/crawls/{{ crawl.id }}/analytics" enctype="multipart/form-data" style="margin-top:10px">
+    <p class="muted" style="margin:0 0 6px; font-size:12.5px">CSV exportado de Search Console (Rendimiento › Páginas) o de Analytics (Páginas y pantallas / Páginas de destino). Se cruza con el rastreo para encontrar huérfanas con tráfico.</p>
+    <input type="file" name="file" accept=".csv,text/csv" required aria-label="CSV de Search Console o Analytics">
+    <p style="margin:8px 0 0"><button class="mini" type="submit">Importar y recalcular</button></p>
+  </form>
+  <div class="menu-sep" style="margin-top:12px">o directamente desde Google</div>
+  <div hx-get="/crawls/{{ crawl.id }}/google" hx-trigger="intersect once" hx-swap="innerHTML"><span class="muted">Cargando…</span></div>
+</dialog>
+{% endblock %}
+{% block content %}
+{% if crawl.status in ('queued', 'running') %}<noscript><meta http-equiv="refresh" content="3"></noscript>{% endif %}
+<div class="wb">
+  <section class="wb-left">
+    {% include "_grid.html" %}
+    <div class="detail" id="detail">
+      <div class="detail-body"><table class="dg kvh"><thead><tr><th>Nombre</th><th>Valor</th></tr></thead></table><div class="big-empty">Ninguna URL seleccionada</div></div>
+      <nav class="tabbar bottom-tabs"><a class="on">Detalles de URL</a><a class="">Enlaces internos</a><a class="">Enlaces salientes</a><a class="">Imágenes</a><a class="">Cabeceras HTTP</a><a class="">Hreflang</a><a class="">Ruta de rastreo</a><a class="">Fragmento de SERP</a><a class="">Captura</a><a class="">Cascada</a><a class="">Calidad</a><a class="">IA</a><a class="">Texto</a><a class="">Ver fuente</a><a class="">Incidencias</a></nav>
+    </div>
+  </section>
+  {% include "_side.html" %}
+</div>
+<div class="ctx-menu" id="ctx" hidden role="menu">
+  <button type="button" role="menuitem" data-act="apuntar">Apuntar sobre esta URL</button>
+  <button type="button" role="menuitem" data-act="copy">Copiar URL</button>
+  <button type="button" role="menuitem" data-act="open">Abrir URL en una pestaña nueva</button>
+</div>
+<dialog class="note-dlg" id="ai-dlg" style="width:min(620px, calc(100vw - 32px))">
+  <div style="display:flex; align-items:center"><h3 style="margin:0">IA en bloque</h3><span style="flex:1"></span>
+    <button type="button" class="secondary mini" data-click="closeDialog" data-args='["$this"]' aria-label="Cerrar">Cerrar</button></div>
+  <p class="muted" style="margin:6px 0 10px">Aplica una tarea de IA a cada página de la vista actual. Los resultados se guardan como columnas en la pestaña «IA» y se exportan con el resto.</p>
+  <div id="ai-bulk-slot"><span class="spinner"></span></div>
+</dialog>
+<dialog class="note-dlg" id="note-dlg">
+  <form id="note-form" method="dialog">
+    <h3 style="margin:0 0 4px">Nota de la URL</h3>
+    <p class="muted url" id="note-url" style="margin:0 0 10px; word-break:break-all"></p>
+    <input type="hidden" name="url">
+    <div class="field" style="max-width:none"><label for="note-status">Estado</label>
+      <select id="note-status" name="status">{% for s in note_statuses %}<option value="{{ s }}">{{ s | capitalize }}</option>{% endfor %}</select></div>
+    <div class="field" style="max-width:none"><label for="note-text">Nota</label>
+      <textarea id="note-text" name="note" rows="4" maxlength="2000" placeholder="Corregir este H1 · Ya revisado con el cliente…"></textarea></div>
+    <p class="muted" style="margin:0 0 10px; font-size:12.5px">Las notas se guardan por sitio: siguen apareciendo en los próximos rastreos de {{ site }}. Para borrar una nota, déjala vacía con estado «Pendiente».</p>
+    <p class="err" id="note-err" hidden></p>
+    <div style="display:flex; gap:8px; justify-content:flex-end">
+      <button type="button" class="secondary mini" data-click="closeDialog" data-args='["$this"]'>Cancelar</button>
+      <button type="submit" class="mini">Guardar</button>
+    </div>
+  </form>
+</dialog>
+<script type="application/json" id="page-data">{{ {"crawlId": crawl.id, "simpleTabs": simple_tabs} | tojson }}</script>
+<script src="/static/crawl.js?v={{ static_v }}"></script>
+{% endblock %}

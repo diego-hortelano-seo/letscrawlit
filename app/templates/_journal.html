@@ -1,0 +1,56 @@
+{# «Notas»: every note written with «Apuntar» in this audit (a new audit starts empty). Loaded into the drawer. #}
+{% macro post(e, vals) -%}
+hx-post="/crawls/{{ crawl.id }}/journal/{{ e.id }}" hx-target="#journal-box" hx-swap="outerHTML" hx-vals='{{ dict(vals, q=q, fstatus=status) | tojson }}'
+{%- endmacro %}
+<div id="journal-box" data-total="{{ counts.total }}" data-pending="{{ counts.pending }}">
+  {% if message %}<div class="alert ok jn-flash" role="status">{{ message }}</div>{% endif %}
+  {% if error %}<div class="alert error" role="alert">{{ error }}</div>{% endif %}
+
+  {% if counts.total > 4 or q %}
+  <form class="jn-filter" hx-get="/crawls/{{ crawl.id }}/journal" hx-target="#journal-box" hx-swap="outerHTML"
+        hx-trigger="input changed delay:300ms from:#jn-q, submit">
+    <input type="search" id="jn-q" name="q" value="{{ q }}" placeholder="Buscar en las notas…" aria-label="Buscar en las notas">
+  </form>
+  {% endif %}
+
+  <ul class="jn-list">
+  {% for e in entries %}
+    <li class="jn-item">
+      <div class="jn-body">
+        <div class="jn-text">{{ e.text }}</div>
+        <div class="jn-meta">
+          {% if e.url %}{% set us = e.url.split('\n') %}
+            {% if us|length == 1 %}<a href="#" class="jn-tag" data-click="journalGoUrl" data-args='{{ [us[0]] | tojson }}' title="{{ us[0] }}">{{ us[0] | replace('https://', '') | replace('http://', '') | truncate(40, true, '…') }}</a>
+            {% else %}<details class="jn-many"><summary class="jn-tag">{{ us|length }} URLs</summary>
+              {% for u in us %}<a href="#" class="jn-go" data-click="journalGoUrl" data-args='{{ [u] | tojson }}'>{{ u }}</a>{% endfor %}</details>{% endif %}
+          {% endif %}
+          <span class="muted jn-date" title="{{ e.created_at[:16] | replace('T', ' ') }}">{{ e.created_at[8:10] }}/{{ e.created_at[5:7] }}/{{ e.created_at[:4] }}</span>
+          <button type="button" class="jn-icon" data-click="journalEdit" data-args='["$this"]' title="Editar" aria-label="Editar la nota">Editar</button>
+          <button type="button" class="jn-icon jn-del" {{ post(e, {'action': 'delete'}) }} hx-confirm="¿Borrar esta nota?" title="Borrar" aria-label="Borrar la nota">Borrar</button>
+        </div>
+        <form class="jn-editform" hidden hx-post="/crawls/{{ crawl.id }}/journal/{{ e.id }}" hx-target="#journal-box" hx-swap="outerHTML">
+          <input type="hidden" name="action" value="edit"><input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="fstatus" value="{{ status }}">
+          <textarea name="text" rows="3" maxlength="4000" required aria-label="Editar la nota">{{ e.text }}</textarea>
+          <div class="jn-save"><button type="button" class="secondary mini" data-click="journalEdit" data-args='["$this"]'>Cancelar</button>
+            <button type="submit" class="mini">Guardar</button></div>
+        </form>
+      </div>
+    </li>
+  {% else %}
+    <li class="jn-empty muted">{% if q %}Ninguna nota coincide.{% else %}Aún no hay notas.<br>Marca una o varias URLs en la tabla y pulsa <b>Apuntar</b>.{% endif %}</li>
+  {% endfor %}
+  </ul>
+
+  {% if url_notes %}
+  <details class="jn-old"><summary>Notas antiguas por URL · {{ url_notes|length }}</summary>
+  <ul class="jn-list">
+    {% for url, n in url_notes if (not q or q.lower() in (n.note ~ ' ' ~ url).lower()) %}
+    <li class="jn-item"><div class="jn-body">
+      {% if n.note %}<div class="jn-text">{{ n.note }}</div>{% endif %}
+      <div class="jn-meta"><a href="#" class="jn-tag" data-click="openNote" data-args='{{ [url] | tojson }}'>{{ url | replace('https://', '') }}</a>
+        <span class="jn-tag">{{ n.status | capitalize }}</span></div></div></li>
+    {% endfor %}
+  </ul></details>
+  {% endif %}
+  <p class="jn-foot muted">Las notas son solo de esta auditoría; una auditoría nueva empieza sin notas. Para dárselas al cliente: <b>Exportar resumen</b> › «Incluir mis notas».</p>
+</div>

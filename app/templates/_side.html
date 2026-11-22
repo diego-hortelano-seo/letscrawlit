@@ -1,0 +1,74 @@
+{% set active = crawl.status in ('queued', 'running') %}
+{% macro qhelp(h) -%}
+  {% if h %}<span class="qhelp" tabindex="0" role="button" aria-label="¿Qué significa?" data-why="{{ h.why }}" data-fix="{{ h.fix }}"{% if h.h1 %} data-h1="{{ h.h1 }}" data-h2="{{ h.h2 }}"{% endif %}>?</span>{% endif %}
+{%- endmacro %}
+{% macro row(label, count, pct, tab=None, f='', level=1, cls='', help=None) -%}
+  <a class="tr lvl{{ level }} {{ cls }} {{ 'zero' if not count }}" {% if tab %}href="/crawls/{{ crawl.id }}?tab={{ tab }}&f={{ f }}"
+     hx-get="/crawls/{{ crawl.id }}/grid?tab={{ tab }}&f={{ f }}" hx-target="#grid" hx-swap="outerHTML"{% endif %}>
+    <span class="lbl"><span class="lbl-t" title="{{ label }}">{{ label }}</span>{{ qhelp(help) }}</span><span class="num">{{ count }}</span><span class="num pct">{% if pct != '' %}{{ pct }}%{% endif %}</span></a>
+{%- endmacro %}
+<aside id="side" class="wb-right"
+       {% if active %}hx-get="/crawls/{{ crawl.id }}/side?pane={{ pane }}" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+  <nav class="tabbar side-tabs">
+    {% for key, label in panes %}
+      <a class="{{ 'on' if key == pane }}" hx-get="/crawls/{{ crawl.id }}/side?pane={{ key }}" hx-target="#side" hx-swap="outerHTML">{{ label }}</a>
+    {% endfor %}
+  </nav>
+  <div class="side-body">
+  {% if pane == 'overview' %}
+    <div class="tree">
+      <div class="tr th"><span class="lbl"></span><span class="num">URLs</span><span class="num pct">% del total</span></div>
+      {% if crawl.notes %}
+      <details class="tg"><summary class="tr lvl0"><span class="lbl">Avisos del rastreo ({{ crawl.notes|length }}){{ qhelp({'why': 'Avisos del propio rastreo: límites alcanzados, URLs omitidas, mediciones repetidas…', 'fix': 'Léelas antes de sacar conclusiones: explican por qué pueden faltar datos.'}) }}</span><span></span><span></span></summary>
+        <ul class="notes">{% for n in crawl.notes %}<li>{{ n }}</li>{% endfor %}</ul></details>
+      {% endif %}
+      <details class="tg" open><summary class="tr lvl0"><span class="lbl">Totales{{ qhelp({'why': 'Recuento general de lo que se ha encontrado y rastreado.', 'fix': 'Sirve para comprobar que el rastreo llegó a toda la web antes de mirar el detalle.'}) }}</span><span></span><span></span></summary>
+        {% for s in summary %}{{ row(s.label, s.count, s.pct, help=s.help) }}{% endfor %}
+      </details>
+      <details class="tg" open><summary class="tr lvl0"><span class="lbl">Datos del rastreo{{ qhelp({'why': 'Cada pestaña de la tabla con sus filtros y cuántas URLs hay en cada uno.', 'fix': 'Haz clic en una fila para abrir ese filtro en la tabla.'}) }}</span><span></span><span></span></summary>
+        {% for g in overview %}
+        <details class="tg" data-tab="{{ g.key }}" {% if g.key in ('internal', 'external') %}open{% endif %}>
+          <summary class="tr lvl1">{% set th = tab_help(g.key) %}<span class="lbl"><span class="lbl-t">{{ g.label }}</span>{% if th %}{{ qhelp({'why': th.why, 'fix': th.fix, 'h1': 'Qué muestra', 'h2': 'Por qué importa'}) }}{% endif %}</span><span></span><span></span></summary>
+          {{ row('Todo', g.total, 100 if g.total else 0, g.key, '', 2, help=g.todo_help) }}
+          {% for fl in g.filters %}{{ row(fl.label, fl.count, fl.pct, g.key, fl.key, 2, help=fl.help) }}{% endfor %}
+        </details>
+        {% endfor %}
+      </details>
+    </div>
+  {% elif pane == 'issues' %}
+    {% if issue_rows %}
+    <table class="dg side-table">
+      <thead><tr><th>Nombre del problema</th><th>Tipo</th><th>Prioridad</th><th class="n">URLs</th><th class="n">% del total</th></tr></thead>
+      <tbody>
+      {% for i in issue_rows %}
+        <tr hx-get="/crawls/{{ crawl.id }}/grid?tab=issues&f={{ i.code }}" hx-target="#grid" hx-swap="outerHTML" title="{{ i.title }}">
+          <td>{{ i.title }}{{ qhelp({'why': i.why, 'fix': i.fix}) }}{% if jn and jn.issue[i.code] %} <span class="jn-mark" title="Apuntes sobre este problema">Notas: {{ jn.issue[i.code] }}</span>{% endif %}</td><td><span class="badge sev-{{ i.severity }}">{{ i.type }}</span></td><td>{{ i.priority }}</td>
+          <td class="n">{{ i.count }}</td><td class="n">{{ i.pct }}%</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% else %}<div class="empty">{% if active %}Los errores se calculan al terminar el rastreo.{% else %}No se detectaron errores.{% endif %}</div>{% endif %}
+    {% if other_issue_groups and not active %}<p class="muted" style="margin:8px 10px">Además hay {{ other_issue_groups }} tipos de aviso que dependen de cada caso.
+      <a href="#" hx-get="/crawls/{{ crawl.id }}/grid?tab=issues&f=_all" hx-target="#grid" hx-swap="outerHTML">Ver los avisos</a></p>{% endif %}
+  {% elif pane == 'structure' %}
+    {% if structure.total %}
+    <div class="tree">
+      <div class="tr th"><span class="lbl">Ruta</span><span class="num">URLs</span><span class="num pct">Indexables</span></div>
+      {% for n in structure.tree %}
+        <div class="tr" style="padding-left: {{ 10 + n.level * 14 }}px"><span class="lbl" title="{{ n.path }}">{{ n.path }}</span><span class="num">{{ n.count }}</span><span class="num pct">{{ n.indexable }}</span></div>
+      {% endfor %}
+    </div>
+    <div class="side-h">Profundidad de rastreo (clics desde la URL inicial)</div>
+    {% for d in structure.depths %}
+      <div class="bar-row"><span>{{ d.label }}</span><div class="bar"><div style="width: {{ d.pct }}%"></div></div><span class="num">{{ d.count }}</span><span class="num pct">{{ d.pct }}%</span></div>
+    {% endfor %}
+    {% else %}<div class="empty">Sin páginas HTML todavía.</div>{% endif %}
+  {% else %}
+    <div class="side-h">Tiempo de descarga del HTML (páginas internas)</div>
+    {% for t in times %}
+      <div class="bar-row"><span>{{ t.label }}</span><div class="bar"><div style="width: {{ t.pct }}%"></div></div><span class="num">{{ t.count }}</span><span class="num pct">{{ t.pct }}%</span></div>
+    {% endfor %}
+  {% endif %}
+  </div>
+  {% include "_side_chart.html" %}
+</aside>

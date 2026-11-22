@@ -1,0 +1,9 @@
+<div id="plag-result">
+{% if results is none %}<div class="alert info">Pega al menos 15 palabras del texto sospechoso.</div>
+{% elif not results %}<div class="alert ok">Ninguna de tus páginas coincide con ese texto.</div>
+{% else %}
+  <table class="dg" style="width:100%"><thead><tr><th>Tu página</th><th>% de tu página presente en el texto</th><th>% del texto que viene de tu página</th><th>Pasaje coincidente más largo</th></tr></thead><tbody>
+  {% for r in results %}<tr><td title="{{ r.url }}">{{ r.url }}</td><td class="n">{{ r.page_copied }} %</td><td class="n">{{ r.external_from_page }} %</td><td title="{{ r.passage }}">{{ r.passage }}</td></tr>{% endfor %}
+  </tbody></table>
+{% endif %}
+</div>

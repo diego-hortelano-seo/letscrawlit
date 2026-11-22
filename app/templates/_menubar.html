@@ -1,0 +1,151 @@
+{# Desktop-style menu bar shared by the start page and the audit page. `c` = current crawl (or none). #}
+{% set c = crawl if crawl is defined and crawl else none %}
+{% set done = c and c.status not in ('queued', 'running') %}
+{% set busy = c and c.status in ('queued', 'running') %}
+{% macro item(label, href=none, act=none, enabled=true, target=none, args=none) -%}
+  {% if not enabled %}<span class="mi disabled" aria-disabled="true">{{ label }}</span>
+  {% elif act %}<button type="button" class="mi" data-click="{{ act }}"{% if args %} data-args='{{ args | tojson }}'{% endif %}>{{ label }}</button>
+  {% else %}<a class="mi" href="{{ href }}" {% if target %}target="{{ target }}" rel="noopener"{% endif %}>{{ label }}</a>{% endif %}
+{%- endmacro %}
+{% macro cfg(label, sec) -%}
+  {% if busy %}{{ item(label, act='openDlg', args=['busy-dlg']) }}{% elif c %}{{ item(label, '/?cfg=' ~ sec ~ '&from=' ~ c.id) }}{% else %}{{ item(label, act='openCfg', args=[sec]) }}{% endif %}
+{%- endmacro %}
+<dialog class="note-dlg" id="ai-setup-dlg" style="width:min(640px, calc(100vw - 32px))">
+  <div style="display:flex; align-items:center"><h3 style="margin:0">Configurar la IA</h3><span style="flex:1"></span>
+    <button type="button" class="secondary mini" data-click="closeDialog" data-args='["$this"]' aria-label="Cerrar">Cerrar</button></div>
+  <p class="muted" style="margin:6px 0 10px">Elige el proveedor y pega tu clave. Se activa al momento, sin reiniciar.</p>
+  <div id="ai-setup-slot"></div>
+</dialog>
+<dialog class="note-dlg consult-dlg" id="consult-dlg">
+  <div style="display:flex; align-items:center; gap:8px"><h3 style="margin:0">Consultor con IA</h3><span style="flex:1"></span>
+    <button type="button" class="mini" data-click="openAiSetup" title="Elige la IA (Gemini, Groq, Claude…) y pega tu clave">Configura tu API</button>
+    <button type="button" class="secondary mini" data-click="closeDialog" data-args='["$this"]' aria-label="Cerrar">Cerrar</button></div>
+  <div id="consult-slot"></div>
+</dialog>
+<button type="button" id="consult-fab" class="consult-fab" data-click="openConsultHere" data-args='[{{ c.id if c else 0 }}]'
+        title="Preguntar al consultor con IA" aria-label="Preguntar al consultor con IA"><span class="cf-txt">Pregunta a la IA</span></button>
+<div id="opt-help" hidden>{% for k, h in option_help.items() %}<span data-key="{{ k }}" data-why="{{ h[0] }}" data-fix="{{ h[1] }}" data-h1="Qué hace" data-h2="A qué afecta" aria-label="¿Qué hace esta opción?"></span>{% endfor %}</div>
+<nav class="menubar" aria-label="Menú principal">
+  <details class="mb"><summary>Archivo</summary><div class="mb-list">
+    {{ item('Nueva auditoría', '/') }}
+    {% if c %}{{ item('Auditorías guardadas…', '/?saved=1') }}{{ item('Abrir archivo de rastreo (.seocrawl)…', '/?open=1') }}
+    {% else %}{{ item('Auditorías guardadas…', act='openDlg', args=['saved-dlg']) }}{{ item('Abrir archivo de rastreo (.seocrawl)…', act='openDlg', args=['open-dlg']) }}{% endif %}
+    {{ item('Guardar como archivo de rastreo (.seocrawl)', '/crawls/' ~ c.id ~ '/export/crawl.seocrawl' if c else '#', enabled=done) }}
+    <div class="mb-sep"></div>
+    {{ item('Importar datos de Search Console / Analytics…', act='openDlg', args=['import-dlg'], enabled=done) }}
+    {{ item('Comparar auditorías…', '/compare?a=' ~ c.id if c else '/compare') }}
+    <div class="mb-sep"></div>
+    {% if c and done %}<form method="post" action="/crawls/{{ c.id }}/delete" data-confirm="¿Eliminar esta auditoría y todos sus datos locales? No se puede deshacer.">
+      <button type="submit" class="mi danger-text">Eliminar esta auditoría</button></form>{% else %}{{ item('Eliminar esta auditoría', enabled=false) }}{% endif %}
+  </div></details>
+  <details class="mb"><summary>Vista</summary><div class="mb-list">
+    {{ item('Mostrar u ocultar pestañas…', act='openTabChooser', enabled=c is not none) }}
+    {{ item('Modo principiante (solo lo esencial)', act='toggleSimple') }}
+    {{ item('Pantalla completa', act='toggleFullscreen') }}
+    {{ item('Botón «Pregunta a la IA»', act='toggleConsultFab') }}
+    {{ item('Avisar de versiones nuevas', act='toggleUpdateNotice') }}
+  </div></details>
+  <details class="mb"><summary>Modo</summary><div class="mb-list">
+    {% set cur_mode = (c.settings.mode if c and c.settings else 'spider') or 'spider' %}
+    {% if c %}<a class="mi {{ 'on' if cur_mode != 'list' }}" href="/?mode=spider">Sitio web<small>rastrea desde una URL siguiendo los enlaces</small></a><a class="mi {{ 'on' if cur_mode == 'list' }}" href="/?mode=list">Lista<small>solo las URLs que pegues, de un sitemap o de un CSV</small></a>
+    {% else %}<button type="button" class="mi mode-mi on" data-mode="spider" data-click="setMode" data-args='["spider"]'>Sitio web<small>rastrea desde una URL siguiendo los enlaces</small></button><button type="button" class="mi mode-mi" data-mode="list" data-click="setMode" data-args='["list"]'>Lista<small>solo las URLs que pegues, de un sitemap o de un CSV</small></button>{% endif %}
+    <span class="mb-div" role="separator"></span>
+    <a class="mi" href="/compare">Comparar<small>qué ha cambiado entre dos auditorías</small></a>
+    {{ cfg('Conectar APIs…', 'apis') }}
+  </div></details>
+  <details class="mb"><summary>Configuración</summary><div class="mb-list">
+    {{ cfg('Rastreador…', 'crawl') }}{{ cfg('Recursos y enlaces…', 'resources') }}{{ cfg('Comportamiento…', 'behaviour') }}
+    {{ cfg('Límites…', 'limits') }}{{ cfg('Renderizado…', 'render') }}{{ cfg('Avanzado…', 'advanced') }}
+    <div class="mb-sep"></div>
+    {{ cfg('Contenido y ortografía…', 'content') }}{{ cfg('Extracción…', 'extraction') }}{{ cfg('Preferencias…', 'prefs') }}
+    <div class="mb-sep"></div>
+    {{ cfg('robots.txt…', 'robots') }}{{ cfg('Reescritura de URL…', 'rewrite') }}{{ cfg('Incluir…', 'include') }}{{ cfg('Excluir…', 'exclude') }}
+    {{ cfg('Velocidad…', 'speed') }}{{ cfg('User-Agent…', 'ua') }}{{ cfg('Header HTTP…', 'headers') }}{{ cfg('DNS y proxy…', 'network') }}
+    <div class="mb-sep"></div>
+    {{ cfg('Búsqueda personalizada…', 'search') }}{{ cfg('Extracción personalizada…', 'extract') }}{{ cfg('SEO local…', 'local') }}
+    <div class="mb-sep"></div>
+    {{ item('Inteligencia artificial (IA)…', act='openAiSetup') }}{{ cfg('Conectar APIs…', 'apis') }}{{ cfg('Autenticación…', 'auth') }}
+  </div></details>
+  <details class="mb"><summary>Exportar todo</summary><div class="mb-list mb-scroll">
+    {% if done %}
+      {{ item('Todas las URLs internas (CSV)', '/crawls/' ~ c.id ~ '/export/pages.csv') }}
+      {{ item('Todas las incidencias (CSV)', '/crawls/' ~ c.id ~ '/export/issues.csv') }}
+      {{ item('Todos los enlaces (CSV)', '/crawls/' ~ c.id ~ '/export/links.csv') }}
+      {{ item('Enlaces externos y recursos (CSV)', '/crawls/' ~ c.id ~ '/export/externals.csv') }}
+      {{ item('Imágenes (CSV)', '/crawls/' ~ c.id ~ '/export/images.csv') }}
+      <div class="mb-sep"></div>
+      {% for key, label in bulk_exports.items() %}{{ item(label, '/crawls/' ~ c.id ~ '/export/bulk/' ~ key ~ '.csv') }}{% endfor %}
+    {% else %}{{ item('Disponible al terminar una auditoría', enabled=false) }}{% endif %}
+  </div></details>
+  <details class="mb"><summary>Informes</summary><div class="mb-list">
+    {{ item('Prioridades', '/crawls/' ~ c.id ~ '/insights' if c else '#', enabled=done) }}
+    {{ item('Informe HTML completo', '/crawls/' ~ c.id ~ '/export/report.html?download=0' if c else '#', enabled=done, target='_blank') }}
+    {{ item('Informe para cliente (marca blanca)', '/crawls/' ~ c.id ~ '/client-report' if c else '#', enabled=done, target='_blank') }}
+    {{ item('Informe para cliente en PDF…', act='openDownload', args=[0], enabled=done) }}
+    {{ item('Resumen para jefes en PDF (2 páginas)…', act='openDownload', args=[1], enabled=done) }}
+    {{ item('Resumen para jefes (ver en el navegador)', '/crawls/' ~ c.id ~ '/client-report?summary=1' if c else '#', enabled=done, target='_blank') }}
+    {{ item('Presentación para el cliente (PowerPoint)', '/crawls/' ~ c.id ~ '/export/presentacion.pptx' if c else '#', enabled=done) }}
+    {{ item('Un Excel por cada tipo de error (ZIP)', '/crawls/' ~ c.id ~ '/export/errores-excel.zip' if c else '#', enabled=done) }}
+    {{ item('Todo en un ZIP reproducible', '/crawls/' ~ c.id ~ '/export/bundle.zip' if c else '#', enabled=done) }}
+    <div class="mb-sep"></div>
+    {{ item('Tendencias históricas', '/trends/' ~ site if c and site is defined else '/trends') }}
+  </div></details>
+  <details class="mb"><summary>Sitemaps</summary><div class="mb-list">
+    {{ item('Generar sitemap XML (URLs indexables)', '/crawls/' ~ c.id ~ '/export/sitemap.xml' if c else '#', enabled=done) }}
+    {{ item('Generar sitemap XML con imágenes', '/crawls/' ~ c.id ~ '/export/sitemap.xml?images=1' if c else '#', enabled=done) }}
+    {{ item('robots.txt usado en el rastreo', '/crawls/' ~ c.id ~ '/export/robots.txt' if c else '#', enabled=done) }}
+  </div></details>
+  <details class="mb"><summary>Gráficos y mapas</summary><div class="mb-list">
+    {{ item('Diagrama de arquitectura y fuerza de enlaces', '/crawls/' ~ c.id ~ '/visual' if c else '#', enabled=done) }}
+    {{ item('Mapa de URLs (inicio en el centro)', '/crawls/' ~ c.id ~ '/visual?mode=radial' if c else '#', enabled=done) }}
+    {{ item('Estructura del sitio', act='htmxLoad', args=['/crawls/' ~ (c.id if c else 0) ~ '/side?pane=structure', '#side'], enabled=c is not none) }}
+    {{ item('Tiempos de respuesta', act='htmxLoad', args=['/crawls/' ~ (c.id if c else 0) ~ '/side?pane=times', '#side'], enabled=c is not none) }}
+  </div></details>
+  <details class="mb"><summary>Análisis de rastreo</summary><div class="mb-list">
+    {{ item('Qué arreglar primero', '/crawls/' ~ c.id ~ '/insights' if c else '#', enabled=done) }}
+    {{ item('Errores (agrupados por patrón de URL)', act='htmxLoad', args=['/crawls/' ~ (c.id if c else 0) ~ '/grid?tab=issues', '#grid'], enabled=done) }}
+    {{ item('IA en bloque sobre la vista actual…', act='openBulk', enabled=done) }}
+    {{ item('Notas de esta web…', act='toggleJournal', enabled=c is not none) }}
+  </div></details>
+  <details class="mb"><summary>Ayuda</summary><div class="mb-list">
+    {{ item('Manual de uso', '/manual') }}
+    {{ item('Tu primera auditoría, paso a paso', '/manual#primera') }}
+    {{ item('Preguntas frecuentes', '/manual#preguntas') }}
+    {{ item('Si algo sale mal', '/manual#si-algo-sale-mal') }}
+    <span class="mb-div" role="separator"></span>
+    {{ item('Comentarios y sugerencias', 'https://diegohortelano.com/', target='_blank') }}
+    {{ item('Diagnóstico…', act='openDlg', args=['diag-dlg']) }}
+    <span class="mb-div" role="separator"></span>
+    {{ item('Acerca de LetsCrawlit…', act='openDlg', args=['about-dlg']) }}
+  </div></details>
+  <span class="mb-spacer"></span>
+  <button type="button" class="mb-top mb-ai" data-click="openConsult" data-args='[{{ c.id if c else 0 }}]' title="Pregunta a un consultor SEO con IA">Consultor con IA</button>
+  <small class="mb-by">by <a href="https://diegohortelano.com/" target="_blank" rel="noopener">Diego Hortelano</a> · <a href="https://www.linkedin.com/in/diego-hortelano-hidalgo/" target="_blank" rel="noopener">LinkedIn</a></small>
+  <span class="mb-sep" aria-hidden="true"></span>
+  {% include "_lang.html" %}
+  <button type="button" class="mb-top" data-click="openDlg" data-args='["theme-dlg"]' title="Colores y modo claro u oscuro">Apariencia</button>
+</nav>
+<dialog class="note-dlg" id="theme-dlg"><div style="display:flex; align-items:center; margin-bottom:8px"><h3 style="margin:0">Apariencia</h3><span style="flex:1"></span>
+  <button type="button" class="secondary mini" data-click="closeDialog" data-args='["$this"]' aria-label="Cerrar">Cerrar</button></div>
+  {% include "_theme_panel.html" %}</dialog>
+<dialog class="note-dlg" id="busy-dlg"><div style="display:flex; align-items:center"><h3 style="margin:0">Rastreo en curso</h3><span style="flex:1"></span>
+  <button type="button" class="secondary mini" data-click="closeDialog" data-args='["$this"]' aria-label="Cerrar">Cerrar</button></div>
+  <p>No puedes cambiar la configuración mientras se rastrea.</p>
+  <p class="muted">Espera a que termine o detén el rastreo; los cambios se aplicarán en el siguiente.</p></dialog>
+<dialog class="note-dlg" id="diag-dlg"><div style="display:flex; align-items:center"><h3 style="margin:0">Diagnóstico</h3><span style="flex:1"></span>
+  <button type="button" class="secondary mini" data-click="closeDialog" data-args='["$this"]' aria-label="Cerrar">Cerrar</button></div>
+  <p class="muted">Si algo no funciona, copia estos datos y añádelos a tu mensaje. No incluyen claves ni datos de tus auditorías.</p>
+  {% set d = diagnostics() %}
+  <textarea id="diag-text" rows="8" readonly spellcheck="false">LetsCrawlit {{ version }}
+Sistema: {{ d.os }}
+Python: {{ d.python }}
+Carpeta de datos: {{ d.data_dir }}
+Registro: {{ d.log }}
+IA: {{ d.ai }}</textarea>
+  <p style="margin:10px 0 0"><button type="button" class="mini" data-click="copyDiag">Copiar</button> <span class="muted" id="diag-ok" role="status"></span></p></dialog>
+<dialog class="note-dlg" id="about-dlg"><div style="display:flex; align-items:center"><h3 style="margin:0">LetsCrawlit {{ version }}</h3><span style="flex:1"></span>
+  <button type="button" class="secondary mini" data-click="closeDialog" data-args='["$this"]' aria-label="Cerrar">Cerrar</button></div>
+  <p>Rastreador y auditor SEO técnico que funciona en tu equipo. Todo se guarda en local.</p>
+  <p>Por <a href="https://diegohortelano.com/" target="_blank" rel="noopener">Diego Hortelano</a> · <a href="https://www.linkedin.com/in/diego-hortelano-hidalgo/" target="_blank" rel="noopener">LinkedIn</a> · licencia MIT.</p>
+  <p class="muted">Línea de comandos: <code>py -3.12 run.py crawl URL --i-own-this-site</code> · integración continua: <code>run.py ci</code></p></dialog>
+

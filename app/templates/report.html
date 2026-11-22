@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Auditoría SEO · {{ crawl.start_url }}</title>
+<style>{{ css | safe }}
+@media print { details.issue { break-inside: avoid; } details.issue[open] summary ~ * { display: block; } }
+</style>
+</head>
+<body>
+<main>
+<h1>Auditoría SEO: {{ crawl.start_url }}</h1>
+<p class="muted">Auditoría · inicio {{ (crawl.started_at or '')[:16].replace('T', ' ') }} UTC · fin {{ (crawl.finished_at or '')[:16].replace('T', ' ') }} UTC ·
+  estado {{ crawl.status }} · generado {{ generated }} con LetsCrawlit v{{ version }}</p>
+{% set s = crawl.extras.summary or {} %}
+<div class="grid">
+  <div class="card"><div class="muted">URLs</div><div class="stat">{{ s.pages or 0 }}</div></div>
+  <div class="card"><div class="muted">Indexables</div><div class="stat">{{ s.indexable or 0 }}</div></div>
+  {% for sev in ('critical', 'high', 'medium', 'low', 'info') %}
+  <div class="card"><div class="muted">{{ severity_label[sev] }}</div><div class="stat">{{ (s.by_severity or {}).get(sev, 0) }}</div></div>
+  {% endfor %}
+</div>
+
+<div class="card">
+  <strong>Configuración (para reproducir)</strong>
+  <ul>
+    <li>Tope de URLs: {{ crawl.settings.max_urls or 'sin límite' }} · pausa: {{ crawl.settings.delay }} s · JavaScript: {{ 'sí' if crawl.settings.render else 'no' }} · robots.txt respetado: sí</li>
+    <li>User-Agent: <code>{{ crawl.settings.user_agent }}</code></li>
+    <li>Permiso confirmado el {{ crawl.ack_at }}: «{{ crawl.ack_text }}»</li>
+  </ul>
+  {% if crawl.notes %}<strong>Avisos del rastreo</strong><ul>{% for n in crawl.notes %}<li>{{ n }}</li>{% endfor %}</ul>{% endif %}
+  <details><summary><strong>Cómo se cuentan enlaces, palabras y tiempos</strong></summary>
+    <ul>{% for k, v in counting_rules.items() %}<li><code>{{ k }}</code>: {{ v }}</li>{% endfor %}</ul></details>
+</div>
+
+<h2>Incidencias priorizadas</h2>
+{% if not groups %}<div class="card empty">No se detectaron incidencias.</div>{% endif %}
+{% for g in groups %}
+<details class="issue" open>
+  <summary><span class="badge sev-{{ g.severity }}">{{ g.severity_label }}</span><strong>{{ g.title }}</strong><span class="count">{{ g['items'] | length }} URL(s)</span></summary>
+  <div class="body">
+    <p><strong>Por qué importa:</strong> {{ g.why }}</p>
+    <p><strong>Cómo solucionarlo:</strong> {{ g.remediation }}</p>
+    {% if g.clusters %}<p><strong>Patrones:</strong> {% for c in g.clusters %}<code>{{ c.pattern }}</code> {{ c.count }} ({{ c.pct }} %){{ ' · ' if not loop.last }}{% endfor %}</p>{% endif %}
+    <div class="table-wrap"><table>
+      <thead><tr><th>URL afectada</th><th>Evidencia</th></tr></thead>
+      <tbody>{% for i in g['items'] %}<tr><td class="url">{{ i.url }}</td><td>{% for part, n in i.evidence|evidence_parts %}{{ part }}{% if n > 1 %} <b class="ev-n">×{{ n }}</b>{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}</td></tr>{% endfor %}</tbody>
+    </table></div>
+  </div>
+</details>
+{% endfor %}
+
+<h2>URLs rastreadas ({{ pages | length }})</h2>
+<div class="card table-wrap" style="padding:0"><table>
+  <thead><tr><th>URL</th><th>Estado</th><th>Indexabilidad</th><th>Título</th><th>Descripción</th><th>H1</th><th>Canonical</th><th>Palabras (contenido / renderizado)</th></tr></thead>
+  <tbody>
+  {% for p in pages %}
+    <tr><td class="url">{{ p.url }}</td><td>{{ 'robots.txt' if p.blocked_by_robots else (p.status_code or 'error') }}</td><td>{{ p.indexability }}</td>
+      <td>{{ p.title or '' }}</td><td>{{ (p.meta_description or '')[:160] }}</td><td>{{ p.h1 | join(' | ') }}</td><td class="url">{{ p.canonical or '' }}</td>
+      <td>{{ p.word_count if p.word_count is not none else '' }}{% if p.rendered_word_count is not none %} / {{ p.rendered_word_count }}{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table></div>
+</main>
+</body>
+</html>

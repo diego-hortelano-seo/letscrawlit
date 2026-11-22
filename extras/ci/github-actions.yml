@@ -1,0 +1,48 @@
+# .github/workflows/seo.yml - fails the deploy if the staging site has blocking SEO problems
+# (e.g. a noindex left on by mistake). Copy into your site's repository and adjust STAGING_URL.
+name: SEO check (LetsCrawlit)
+
+on:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  seo:
+    runs-on: ubuntu-latest
+    env:
+      STAGING_URL: https://staging.example.com/
+      # Optional: HTTP basic auth for staging, stored as repository secrets
+      CRAWL_AUTH_USER: ${{ secrets.STAGING_USER }}
+      CRAWL_AUTH_PASSWORD: ${{ secrets.STAGING_PASSWORD }}
+    steps:
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Get LetsCrawlit
+        run: git clone --depth 1 https://github.com/YOUR-USER/letscrawlit.git letscrawlit
+      - name: Install
+        working-directory: letscrawlit
+        run: |
+          python -m pip install -r requirements.txt
+          python -m playwright install --with-deps chromium
+      - name: Restore previous result (only new problems fail)
+        uses: actions/cache/restore@v4
+        with:
+          path: letscrawlit/seo-baseline.json
+          key: seo-baseline-${{ github.base_ref || github.ref_name }}
+      - name: Crawl and check
+        working-directory: letscrawlit
+        run: |
+          BASELINE=""
+          if [ -f seo-baseline.json ]; then BASELINE="--baseline seo-baseline.json"; fi
+          python -m app.cli ci "$STAGING_URL" --i-own-this-site --max-urls 500 \
+            --fail-on critical,high --fail-on-code noindex_in_sitemap,broken_link \
+            --junit seo-junit.xml --json seo-result.json $BASELINE
+      - name: Upload report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: seo-report
+          path: |
+            letscrawlit/seo-junit.xml
+            letscrawlit/seo-result.json

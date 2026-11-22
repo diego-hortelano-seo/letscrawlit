@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Error {{ code }} · LetsCrawlit{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>{% if code == 404 %}No encontrado{% elif code == 409 %}Ahora no es posible{% else %}Algo ha fallado{% endif %}</h1>
+  <div class="alert error">{{ message }}</div>
+  <div class="row"><a class="btn" href="/">Ir al inicio</a><a class="btn secondary" href="#" data-click="goBack">Volver</a></div>
+</div>
+{% endblock %}

@@ -1,0 +1,41 @@
+{% extends "base.html" %}
+{% block title %}Manual de uso · LetsCrawlit{% endblock %}
+{% block main_class %}man-main man-short{% endblock %}
+{% block content %}
+<div class="man-top">
+  <a href="/">Volver a la app</a>
+</div>
+<article class="man-body card">
+  <h1>Manual de uso</h1>
+  <p>Aquí tienes lo básico para empezar. Las guías completas, con tutoriales paso a paso y cada pestaña explicada, estarán en <a href="https://letscrawlit.com/" target="_blank" rel="noopener">letscrawlit.com</a> (próximamente).</p>
+
+  <h2 id="primera">Tu primera auditoría</h2>
+  <ol>
+    <li>Escribe arriba la dirección de la web.</li>
+    <li>Elige el alcance junto a la dirección: Subdominio (toda la web), Subcarpeta, Todos los subdominios o URL exacta.</li>
+    <li>Marca «Tengo permiso». Solo se pueden rastrear webs propias o con permiso de su dueño.</li>
+    <li>Elige una de las cuatro opciones de la pantalla de inicio o pulsa Rastrear.</li>
+    <li>Mientras rastrea, la tabla se rellena sola. Puedes pausar el rastreo y reanudarlo cuando quieras.</li>
+    <li>Al terminar, empieza por la pestaña Errores: solo muestra fallos que siempre son un error, con el porqué y cómo arreglarlos.</li>
+  </ol>
+
+  <h2 id="despues">Y después</h2>
+  <ul>
+    <li><strong>Informes:</strong> un informe para el cliente en lenguaje sencillo, en PDF o HTML, y también presentación y Excel.</li>
+    <li><strong>Exportar:</strong> cualquier tabla en CSV, tal como la ves.</li>
+    <li><strong>Consultor con IA:</strong> opcional, con tu propia clave o con un modelo en tu equipo.</li>
+    <li><strong>Comparar:</strong> dos auditorías de la misma web, para ver qué ha cambiado.</li>
+  </ul>
+
+  <h2 id="si-algo-sale-mal">Si algo sale mal</h2>
+  <p><strong>Solo ha rastreado 1 URL.</strong> Casi siempre es porque la página de inicio no tiene enlaces normales que se puedan seguir, porque robots.txt bloquea el rastreo o porque la web redirige a otro dominio. Mira la pestaña Códigos de respuesta y los «Avisos del rastreo» del resumen.</p>
+  <p><strong>Va muy lento.</strong> El renderizado JavaScript abre cada página en un navegador real y es más lento. Si la web no lo necesita, desactívalo en Configuración › Rastreador › Renderizado.</p>
+  <p><strong>El servidor da errores 5xx o 429 durante el rastreo.</strong> Lo estás cargando demasiado: sube la pausa entre peticiones y baja los hilos en Configuración › Velocidad.</p>
+  <p><strong>Necesitas ayuda.</strong> En Ayuda › Diagnóstico puedes copiar los datos que necesita quien te ayude. Nunca incluyen claves ni datos de tus auditorías.</p>
+
+  <h2 id="preguntas">Preguntas frecuentes</h2>
+  <p><strong>¿Es gratis?</strong> Sí. LetsCrawlit es gratis y de código abierto (licencia MIT), sin cuentas ni suscripciones.</p>
+  <p><strong>¿Dónde se guardan mis datos?</strong> En tu ordenador. Nada sale de él salvo que uses la IA, PageSpeed o los datos de Google, y solo cuando tú lo pides. Lo único automático es preguntar a GitHub si hay una versión nueva, sin enviar nada tuyo (se desactiva en Vista).</p>
+  <p><strong>¿Puedo rastrear cualquier web?</strong> Solo si es tuya o tienes permiso. LetsCrawlit respeta siempre robots.txt y no cambia nada en ninguna web: solo lee.</p>
+</article>
+{% endblock %}

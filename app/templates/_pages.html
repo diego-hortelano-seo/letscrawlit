@@ -1,0 +1,39 @@
+<div id="pages">
+  <form class="row" style="margin-bottom:10px" action="/crawls/{{ crawl.id }}/pages"
+        hx-get="/crawls/{{ crawl.id }}/pages" hx-target="#pages" hx-swap="outerHTML" hx-trigger="input changed delay:300ms from:input, change from:select, submit">
+    <input type="search" name="q" value="{{ q }}" placeholder="Filtrar por URL o título" style="max-width:360px" aria-label="Buscar">
+    <select name="f" style="max-width:200px" aria-label="Filtro">
+      {% for key, label in filters.items() %}<option value="{{ key }}" {% if key == f %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <noscript><button type="submit">Filtrar</button></noscript>
+    <span class="muted">{{ total }} resultado(s)</span><span class="spinner htmx-indicator"></span>
+  </form>
+  {% if rows %}
+  <div class="card table-wrap" style="padding:0">
+    <table>
+      <thead><tr><th>URL</th><th>Estado</th><th>Indexabilidad</th><th>Título</th><th>Palabras (HTML/JS)</th><th>ms</th></tr></thead>
+      <tbody>
+      {% for p in rows %}
+        <tr>
+          <td class="url"><a href="/crawls/{{ crawl.id }}/page?url={{ quote(p.url, safe='') }}">{{ p.url }}</a>{% if p.redirect_target %}<br><span class="muted">Redirige a {{ p.redirect_target }}</span>{% endif %}</td>
+          <td>{% if p.blocked_by_robots %}<span class="badge sev-info">robots.txt</span>{% elif p.status_code %}<span class="badge {{ 'st-completed' if p.status_code == 200 else ('sev-medium' if p.status_code < 400 else 'sev-critical') }}">{{ p.status_code }}</span>{% else %}<span class="badge sev-critical">error</span>{% endif %}</td>
+          <td>{{ p.indexability }}</td>
+          <td>{{ (p.title or '')[:90] }}</td>
+          <td>{{ p.word_count if p.word_count is not none else '–' }} / {{ p.rendered_word_count if p.rendered_word_count is not none else '–' }}</td>
+          <td>{{ p.response_ms or '' }}</td>
+        </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pages_count > 1 %}
+  <div class="row" style="margin-top:10px">
+    {% if page > 1 %}<a class="btn secondary" href="/crawls/{{ crawl.id }}/pages?q={{ quote(q) }}&f={{ f }}&page={{ page - 1 }}" hx-get="/crawls/{{ crawl.id }}/pages?q={{ quote(q) }}&f={{ f }}&page={{ page - 1 }}" hx-target="#pages" hx-swap="outerHTML">Anterior</a>{% endif %}
+    <span class="muted">Página {{ page }} de {{ pages_count }}</span>
+    {% if page < pages_count %}<a class="btn secondary" href="/crawls/{{ crawl.id }}/pages?q={{ quote(q) }}&f={{ f }}&page={{ page + 1 }}" hx-get="/crawls/{{ crawl.id }}/pages?q={{ quote(q) }}&f={{ f }}&page={{ page + 1 }}" hx-target="#pages" hx-swap="outerHTML">Siguiente</a>{% endif %}
+  </div>
+  {% endif %}
+  {% else %}
+    <div class="card empty">No hay URLs que coincidan con el filtro.</div>
+  {% endif %}
+</div>

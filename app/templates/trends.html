@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% block title %}Tendencias · LetsCrawlit{% endblock %}
+{% block content %}
+<h1>Tendencias históricas</h1>
+{% if missing %}<div class="card empty" style="margin-bottom:12px"><b>{{ missing }}</b><br>Aún no hay ninguna auditoría terminada de esta web. Cuando termine un rastreo, aquí verás cómo evoluciona.</div>{% endif %}
+{% if not sites %}<div class="card empty">Aún no hay auditorías terminadas. Rastrea tu sitio periódicamente (o prográmalo abajo) para ver su evolución.</div>{% endif %}
+<div class="row" style="margin-bottom:12px">{% for s in sites %}
+  <a class="btn {{ '' if trend and trend.site == s.site else 'secondary' }} mini" href="/trends/{{ s.site }}">{{ s.site }} ({{ s.crawls }})</a>{% endfor %}</div>
+{% if trend %}
+  <div class="row" style="align-items:center; margin-bottom:10px">
+    <p class="muted" style="margin:0">{{ trend.points|length }} auditoría(s) de {{ trend.site }}, de {{ trend.points[0].date }} a {{ trend.points[-1].date }}.</p>
+    <span class="spacer" style="flex:1"></span>
+    <a class="btn secondary mini" href="/trends/{{ trend.site }}.csv" title="Una fila por auditoría y una columna por métrica">Exportar CSV (Looker Studio, Sheets, Excel)</a>
+  </div>
+
+  <div class="card">
+    <form method="get" class="row" style="align-items:center; margin-bottom:6px">
+      <label for="metric"><strong>Gráfico:</strong></label>
+      <select id="metric" name="metric" data-change="submitForm" data-args='["$this"]'>{% for s in trend.series %}<option value="{{ s.key }}" {% if s.key == metric %}selected{% endif %}>{{ s.label }}</option>{% endfor %}</select>
+      <noscript><button class="mini">Ver</button></noscript>
+      <span class="muted">{{ 'Cuanto más bajo, mejor.' if lower_better else 'Cuanto más alto, mejor.' }}</span>
+    </form>
+    {% if chart %}
+    <div class="chart-scroll"><svg class="trend-chart" viewBox="0 0 {{ chart.w }} {{ chart.h }}" width="100%" role="img" aria-label="{{ metric_label }} a lo largo del tiempo">
+      {% for t in chart.ticks %}<line x1="{{ chart.left }}" x2="{{ chart.right }}" y1="{{ t.y }}" y2="{{ t.y }}" class="grid-line"/>
+        <text x="{{ chart.left - 8 }}" y="{{ t.y + 4 }}" text-anchor="end" class="axis">{{ t.v|round(1) if t.v != t.v|int else t.v|int }}</text>{% endfor %}
+      <path d="{{ chart.area }}" class="area"/>
+      <path d="{{ chart.path }}" class="line"/>
+      {% for d in chart.dots %}
+        <a href="/crawls/{{ d.id }}"><circle cx="{{ d.x }}" cy="{{ d.y }}" r="5" class="dot"><title>{{ d.date }} · {{ metric_label }}: {{ d.v }}</title></circle></a>
+        {% if d.label %}<text x="{{ d.x }}" y="{{ chart.bottom + 20 }}" text-anchor="middle" class="axis">{{ d.date[5:] }}</text>{% endif %}
+      {% endfor %}
+    </svg></div>
+    {% endif %}
+  </div>
+
+  <div class="trend-grid" style="margin-top:12px">
+  {% for s in trend.series %}
+    <a class="card trend-card {{ 'on' if s.key == metric }}" href="?metric={{ s.key }}">
+      <div class="muted">{{ s.label }}</div>
+      <div class="stat">{{ s.last }}{% if s.data|length > 1 %}
+        {% set d = s.last - s.first %}<small class="{{ 'up' if d > 0 else ('down' if d < 0 else '') }}" style="font-size:.8rem"> {{ '+' if d > 0 }}{{ d|round(1) }}</small>{% endif %}</div>
+      <div class="spark-wrap">{{ svg_line(s.data)|safe }}</div>
+    </a>
+  {% endfor %}
+  </div>
+
+  <h2>Rastreo periódico</h2>
+  <div class="card">
+    {% if scheduled == 'ok' %}<div class="alert info">Tarea programada creada en el Programador de tareas de Windows.</div>
+    {% elif scheduled == 'error' %}<div class="alert error">Windows no dejó crear la tarea. Prueba a ejecutar el comando de abajo en una terminal.</div>{% endif %}
+    <p style="margin-top:0">Para que esta gráfica se llene sola, programa una auditoría automática de <code>{{ start_url }}</code>. Cada rastreo se añade aquí.</p>
+    {% if is_windows %}
+    <form method="post" action="/trends/{{ trend.site }}/schedule" class="row" style="align-items:end">
+      <label>Frecuencia<select name="freq"><option value="daily">Cada día</option><option value="weekly" selected>Cada lunes</option><option value="monthly">El día 1 de cada mes</option></select></label>
+      <label>Hora<input type="time" name="time" value="03:00" required></label>
+      <label class="check"><input type="checkbox" name="ack" value="yes" required> <span>El sitio es mío o tengo permiso para rastrearlo periódicamente</span></label>
+      <button type="submit" class="mini">Crear tarea programada</button>
+    </form>
+    <p class="muted">Equivale a: <code>{{ schedule_preview }}</code>. El ordenador debe estar encendido a esa hora.</p>
+    {% else %}
+    <p class="muted">En macOS/Linux: <code>py run.py schedule {{ start_url }} --i-own-this-site --daily 03:00</code> te da la línea para cron.</p>
+    {% endif %}
+  </div>
+
+  <h2>Auditorías</h2>
+  <div class="card table-wrap" style="padding:0"><table class="dg" style="width:100%">
+    <thead><tr><th>Fecha</th><th>URLs</th><th>Indexables</th><th>Incidencias</th><th>4xx</th><th>Rotos</th><th>Imágenes (MB)</th><th>ms medio</th></tr></thead>
+    <tbody>{% for p in trend.points|reverse %}<tr><td><a href="/crawls/{{ p.id }}">{{ p.date }}</a></td>
+      <td class="n">{{ p.pages }}</td><td class="n">{{ p.indexable }}</td><td class="n">{{ p.issues }}</td><td class="n">{{ p.errors_4xx }}</td>
+      <td class="n">{{ p.broken_links }}</td><td class="n">{{ p.images_mb }}</td><td class="n">{{ p.avg_response_ms }}</td></tr>{% endfor %}</tbody>
+  </table></div>
+{% endif %}
+{% endblock %}

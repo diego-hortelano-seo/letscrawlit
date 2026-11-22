@@ -1,0 +1,31 @@
+{% set active = crawl.status in ('queued', 'running') %}
+<div id="status" class="tb-status"
+     {% if active %}hx-get="/crawls/{{ crawl.id }}/status?was={{ crawl.status }}" hx-trigger="every 1s" hx-swap="outerHTML"{% endif %}>
+  <span class="badge st-{{ crawl.status }}">{{ status_label[crawl.status] }}</span>
+  {% if active %}
+    <span class="spinner" aria-hidden="true"></span>
+    {% if crawl.phase in ('externals', 'resources', 'pagespeed', 'retest') %}
+      {% set pct = (100 * crawl.ext_done / (crawl.ext_total or 1)) | round | int %}
+      <span>{{ {'externals': 'Comprobando enlaces externos', 'resources': 'Comprobando recursos internos', 'pagespeed': 'PageSpeed Insights', 'retest': 'Repitiendo tiempos lentos'}[crawl.phase] }} {{ crawl.ext_done }} / {{ crawl.ext_total }}</span>
+    {% elif crawl.phase == 'analysis' %}
+      {% set pct = 100 %}<span>Analizando incidencias…</span>
+    {% elif crawl.phase in (None, 'setup') %}
+      {% set pct = 0 %}<span>Leyendo robots.txt y sitemap…</span>
+    {% else %}
+      {% set pct = (100 * crawl.pages_done / (crawl.urls_queued or 1)) | round | int %}
+      <span>{{ crawl.pages_done }} / {{ crawl.urls_queued }} URLs · pausa {{ crawl.settings.delay }} s</span>
+    {% endif %}
+    <div class="progress" role="progressbar" aria-valuenow="{{ pct }}" aria-valuemin="0" aria-valuemax="100"><div style="width: {{ pct }}%"></div></div>
+    <strong class="ub-pct">{{ pct }}%</strong>
+  {% elif crawl.status == 'paused' %}
+    <span class="muted" title="En pausa · {{ crawl.pages_done }} URL(s) rastreadas, el resto queda pendiente. Los datos mostrados son parciales.">En pausa · {{ crawl.pages_done }} URL(s) rastreadas, el resto queda pendiente. Los datos mostrados son parciales.</span>
+  {% elif crawl.status in ('failed', 'interrupted') %}
+    <span class="err" role="alert" title="{{ crawl.error or '' }}">{{ (crawl.error or 'El rastreo no terminó correctamente.')[:140] }}</span>
+  {% elif crawl.status == 'cancelled' %}
+    <span class="muted">Detenido por ti · se analizaron {{ crawl.pages_done }} URL(s)</span>
+  {% else %}
+    {% set s = crawl.extras.summary or {} %}{% set n_iss = issue_total(crawl.id) if s else 0 %}
+    <span class="muted" title="{{ s.pages or 0 }} páginas · {{ s.indexable or 0 }} indexables · {{ n_iss }} incidencias">{{ s.pages or 0 }} páginas · {{ s.indexable or 0 }} indexables · {{ n_iss }} incidencias
+      {% if crawl.extras.pagespeed %} · PageSpeed móvil {{ crawl.extras.pagespeed.performance }}/100{% endif %}</span>
+  {% endif %}
+</div>

@@ -1,0 +1,226 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'%3E%3Crect width='32' height='32' rx='8' fill='%23331942'/%3E%3Ctext x='16' y='22' text-anchor='middle' font-family='Arial' font-weight='700' font-size='15' fill='%23d58cfd'%3ELC%3C/text%3E%3C/svg%3E">
+<title>{{ 'Resumen SEO' if summary else 'Informe SEO' }} · {{ client or site }}</title>
+<style>
+{% for w, uri in (font_uris or {}).items() %}@font-face { font-family: "IBM Plex Sans"; src: url("{{ uri }}") format("woff2"); font-weight: {{ w }}; font-display: swap; }{% endfor %}
+:root { --brand: {{ branding.color }}; --ink: #241530; --muted: #6d5a7a; --line: #e8d9f3; --soft: #f6effb;
+        --ok: #1f8a5b; --ok-bg: #e5f6ee; --bad: #c0392b; --bad-bg: #fdecea; --warn: #b26a00; --warn-bg: #fff4e0; }
+* { box-sizing: border-box; }
+body { margin: 0; background: #ece6f1; color: var(--ink); font: 15px/1.5 "IBM Plex Sans", "Segoe UI", system-ui, sans-serif; }
+h1, h2, h3, h4, strong, b { font-weight: 600; }
+.sheet { max-width: 820px; margin: 24px auto; background: #fff; border-radius: 22px; padding: 40px 44px; box-shadow: 0 10px 40px rgba(51,25,66,.12); }
+header { display: flex; justify-content: space-between; align-items: flex-start; gap: 16px; border-bottom: 3px solid var(--brand); padding-bottom: 16px; }
+header .brand { font-weight: 600; font-size: 18px; color: var(--brand); }
+header .meta { text-align: right; color: var(--muted); font-size: 13px; }
+h1 { font-size: 30px; line-height: 1.15; margin: 22px 0 4px; }
+h2 { font-size: 19px; margin: 30px 0 10px; color: var(--brand); }
+.muted { color: var(--muted); }
+.score { display: flex; gap: 24px; align-items: center; background: var(--soft); border-radius: 18px; padding: 20px 24px; margin-top: 18px; }
+.score .grade { font-size: 22px; font-weight: 600; }
+.delta-up { color: var(--ok); font-weight: 600; } .delta-down { color: var(--bad); font-weight: 600; }
+ol.actions { list-style: none; padding: 0; margin: 0; counter-reset: a; }
+ol.actions li { counter-increment: a; border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px 14px 58px; margin-bottom: 10px; position: relative; break-inside: avoid; }
+ol.actions li::before { content: counter(a); position: absolute; left: 16px; top: 14px; width: 30px; height: 30px; border-radius: 6px;
+  background: var(--brand); color: #fff; font-weight: 600; display: grid; place-items: center; }
+.tag { display: inline-block; font-size: 12px; font-weight: 600; border-radius: 6px; padding: 2px 10px; margin-left: 6px; vertical-align: 2px; }
+.imp-critical, .imp-high { background: var(--bad-bg); color: var(--bad); } .imp-medium { background: var(--warn-bg); color: var(--warn); }
+.imp-low, .imp-info { background: var(--soft); color: var(--muted); }
+.action-title { font-weight: 600; font-size: 16px; }
+.how { margin-top: 6px; font-size: 14px; }
+.list { display: grid; grid-template-columns: 1fr; gap: 6px; padding: 0; margin: 0; list-style: none; }
+.list li { display: flex; gap: 10px; align-items: baseline; padding: 8px 12px; border-radius: 12px; background: var(--soft); break-inside: avoid; }
+.ic { flex: none; width: 22px; height: 22px; border-radius: 6px; display: inline-grid; place-items: center; font-weight: 600; font-size: 13px; }
+.ic.ok { background: var(--ok-bg); color: var(--ok); } .ic.no { background: var(--bad-bg); color: var(--bad); } .ic.na { background: #eee; color: #888; }
+.list .detail { margin-left: auto; color: var(--muted); font-size: 13px; text-align: right; }
+.two { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+table { width: 100%; border-collapse: collapse; font-size: 14px; }
+th, td { text-align: left; padding: 8px 10px; border-bottom: 1px solid var(--line); }
+th { color: var(--muted); font-weight: 500; }
+td.num { text-align: right; font-variant-numeric: tabular-nums; }
+.charts { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+.chart { border: 1px solid var(--line); border-radius: 16px; padding: 14px 16px; break-inside: avoid; }
+.chart-title { font-weight: 600; margin-bottom: 10px; }
+.legend { list-style: none; margin: 0; padding: 0; font-size: 13px; }
+.legend li { display: flex; align-items: center; gap: 6px; margin: 3px 0; }
+.legend i { width: 10px; height: 10px; border-radius: 6px; flex: none; }
+.bar-row { display: grid; grid-template-columns: 110px 1fr 36px; gap: 8px; align-items: center; font-size: 13px; margin: 6px 0; }
+.bar { height: 12px; background: var(--soft); border-radius: 6px; overflow: hidden; }
+.bar > div { height: 100%; border-radius: 6px; min-width: 2px; }
+.bar-row strong { text-align: right; }
+footer { margin-top: 34px; padding-top: 14px; border-top: 1px solid var(--line); display: flex; justify-content: space-between; gap: 12px; color: var(--muted); font-size: 13px; }
+.toolbar { max-width: 820px; margin: 16px auto 0; background: #fff; border-radius: 16px; padding: 12px 16px; display: flex; flex-wrap: wrap; gap: 8px; align-items: end; font-size: 13px; }
+.toolbar label { display: flex; flex-direction: column; gap: 2px; color: var(--muted); }
+.toolbar input { font: inherit; padding: 6px 10px; border: 1px solid var(--line); border-radius: 10px; min-width: 150px; }
+.toolbar input[type=color] { min-width: 44px; padding: 2px; height: 32px; }
+.toolbar input[type=file]::file-selector-button { font: inherit; font-weight: 600; margin-right: 10px; padding: 4px 12px; border-radius: 6px; border: 1px solid var(--brand); background: #fff; color: var(--brand); cursor: pointer; }
+.toolbar button, .toolbar a { font: inherit; font-weight: 600; border: 0; border-radius: 6px; padding: 8px 16px; background: var(--brand); color: #fff; cursor: pointer; text-decoration: none; }
+.toolbar .sec { background: var(--soft); color: var(--ink); }
+@media (max-width: 640px) { .sheet { padding: 24px 18px; margin: 12px; } .two, .charts { grid-template-columns: 1fr; } .score { flex-direction: column; text-align: center; } }
+@media print {
+  body { background: #fff; } .toolbar { display: none; }
+  .sheet { box-shadow: none; margin: 0; padding: 0; max-width: none; border-radius: 0; }
+  @page { size: A4; margin: 14mm; }
+  h2 { break-after: avoid; }
+  .page2 { break-before: page; }
+}
+.verdict { display: inline-block; font-weight: 600; border-radius: 6px; padding: 2px 12px; margin-left: 6px; font-size: 15px; }
+.v-good { background: var(--ok-bg); color: var(--ok); } .v-mid { background: var(--warn-bg); color: var(--warn); } .v-bad { background: var(--bad-bg); color: var(--bad); }
+.summary .charts { margin-top: 6px; }
+.summary .big-legend { font-size: 15px; } .summary .big-legend i { width: 14px; height: 14px; }
+.consultant-notes { list-style: none; padding: 0; margin: 0; display: grid; gap: 8px; }
+.consultant-notes li { border-left: 3px solid var(--brand, #c77dff); padding: 4px 10px; break-inside: avoid; }
+.cn-date { color: #777; font-size: 12px; margin-right: 6px; }
+.cn-text { white-space: pre-wrap; }
+.wide-note { font-size: 12px; margin: 8px 0 0; }
+.cn-urls { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 4px; }
+.cn-urls span { font-size: 11.5px; color: #555; background: #f4eef9; border-radius: 4px; padding: 1px 6px; word-break: break-all; }
+.consultant-comment { margin: 14px 0 4px; padding: 10px 14px; border-radius: 10px; background: #f8f3fc; border-left: 4px solid var(--brand, #c77dff); }
+.consultant-comment p { margin: 4px 0 0; white-space: pre-wrap; }
+</style>
+</head>
+<body>
+{% if not for_download %}
+<form class="toolbar" method="post" action="/crawls/{{ crawl.id }}/client-report/branding">
+  <label>Cliente<input name="client" value="{{ client }}" placeholder="Cerrajería López"></label>
+  <label>Tu marca<input name="brand" value="{{ branding.brand }}" placeholder="Tu nombre o agencia"></label>
+  <label>Tu contacto<input name="contact" value="{{ branding.contact }}" placeholder="web · teléfono · email"></label>
+  <label>Color<input type="color" name="color" value="{{ branding.color }}"></label>
+  <button type="submit">Aplicar y recordar marca</button>
+  {% if summary %}<input type="hidden" name="summary" value="1">{% endif %}
+  <a href="/crawls/{{ crawl.id }}/client-report/pdf?client={{ client | urlencode }}{{ '&summary=1' if summary }}">Descargar PDF</a>
+  <a class="sec" href="?client={{ client | urlencode }}&download=1{{ '&summary=1' if summary }}">Descargar HTML</a>
+  <a class="sec" href="?client={{ client | urlencode }}{{ '' if summary else '&summary=1' }}">{{ 'Ver informe completo' if summary else 'Ver resumen de 2 páginas' }}</a>
+</form>
+<form class="toolbar" method="post" action="/crawls/{{ crawl.id }}/client-report/logo?client={{ client | urlencode }}" enctype="multipart/form-data" style="margin-top:8px">
+  <label>Logo de tu agencia (PNG, JPG, WebP o SVG, máx. 1 MB)<input type="file" name="file" accept="image/png,image/jpeg,image/webp,image/svg+xml" required></label>
+  <button type="submit">Subir logo</button>
+  {% if logo %}<button type="submit" class="sec" name="remove" value="1" formnovalidate>Quitar logo</button>{% endif %}
+  {% if error %}<span style="color:var(--bad); font-weight:600">{{ error }}</span>{% endif %}
+</form>
+{% endif %}
+<div class="sheet {{ 'summary' if summary }}">
+<header>
+  <div style="display:flex; gap:14px; align-items:center">
+    {% if logo %}<img src="{{ logo }}" alt="{{ branding.brand or 'Logo' }}" style="max-height:56px; max-width:180px; object-fit:contain">{% endif %}
+    <div><div class="brand">{{ branding.brand or ('' if logo else 'Informe SEO') }}</div>{% if branding.contact %}<div class="muted" style="font-size:13px">{{ branding.contact }}</div>{% endif %}</div></div>
+  <div class="meta">{{ date }}<br>{{ site }}</div>
+</header>
+
+<h1>¿Cómo está tu web{% if client %}, {{ client }}{% endif %}?</h1>
+<p class="muted" style="margin:0">{% if summary %}Resumen de la revisión de {{ health.urls }} páginas de {{ crawl.start_url }}: cómo están las páginas y las 3 cosas más importantes que arreglar.{% else %}Revisión de {{ health.urls }} páginas de {{ crawl.start_url }}. Explicado sin tecnicismos: qué está bien, qué arreglar primero y por qué.{% endif %}</p>
+
+{% if comment %}<div class="consultant-comment"><strong>Comentario de tu consultor</strong><p>{{ comment }}</p></div>{% endif %}
+
+{% set serious = actions | selectattr('severity', 'in', ['critical', 'high']) | list %}
+{% set v = 'good' if not actions else ('bad' if serious else 'mid') %}
+<div class="score">
+  <div>
+    <div class="grade">{{ health.clean_urls }} de {{ health.urls }} páginas están bien en los {{ good|length }} puntos básicos.</div>
+  </div>
+</div>
+
+<h2>Tu web en gráficos</h2>
+<div class="charts">
+  {% if summary %}
+  {% set clean = health.clean_urls %}{% set bad = health.urls - health.clean_urls %}{% set tot = [health.urls, 1] | max %}
+  <div class="chart">
+    <div class="chart-title">Páginas bien frente a páginas con algún problema</div>
+    <div style="display:flex; gap:16px; align-items:center">
+      <svg width="140" height="140" viewBox="0 0 120 120" role="img" aria-label="{{ clean }} páginas bien y {{ bad }} con problemas">
+        <circle cx="60" cy="60" r="48" fill="none" stroke="#c0392b" stroke-width="20"/>
+        <circle cx="60" cy="60" r="48" fill="none" stroke="#1f8a5b" stroke-width="20" stroke-dasharray="{{ (301.59 * clean / tot) | round(2) }} 301.59" transform="rotate(-90 60 60)"/>
+        <text x="60" y="66" text-anchor="middle" font-size="20" font-weight="700" fill="#241530">{{ (100 * clean / tot) | round | int }} %</text>
+      </svg>
+      <ul class="legend big-legend"><li><i style="background:#1f8a5b"></i>Bien <strong>{{ clean }}</strong></li>
+        <li><i style="background:#c0392b"></i>Con problemas <strong>{{ bad }}</strong></li></ul>
+    </div>
+    {% if health.site_wide %}<p class="muted wide-note">Sin contar {{ health.site_wide|length }} problema{{ 's' if health.site_wide|length > 1 }} que afecta{{ 'n' if health.site_wide|length > 1 }} a toda la web y se arregla{{ 'n' if health.site_wide|length > 1 }} una sola vez: {{ health.site_wide | map(attribute='title') | join(', ') }}.</p>{% endif %}
+  </div>
+  {% endif %}
+  <div class="chart">
+    <div class="chart-title">Estado de las {{ charts.status_total }} direcciones revisadas</div>
+    <div style="display:flex; gap:16px; align-items:center">
+      <svg width="130" height="130" viewBox="0 0 120 120" role="img" aria-label="Reparto de direcciones por estado">
+        <circle cx="60" cy="60" r="48" fill="none" stroke="#eee" stroke-width="18"/>
+        {% for a in charts.status %}<circle cx="60" cy="60" r="48" fill="none" stroke="{{ a.color }}" stroke-width="18"
+          stroke-dasharray="{{ a.dash }} 301.59" stroke-dashoffset="{{ a.offset }}" transform="rotate(-90 60 60)"><title>{{ a.label }}: {{ a.n }}</title></circle>{% endfor %}
+      </svg>
+      <ul class="legend">{% for a in charts.status %}<li><i style="background:{{ a.color }}"></i>{{ a.label }} <strong>{{ a.n }}</strong> <span class="muted">({{ a.pct }} %)</span></li>{% endfor %}</ul>
+    </div>
+  </div>
+  {% if not summary %}
+  <div class="chart">
+    <div class="chart-title">Avisos por importancia</div>
+    {% for b in charts.severity %}
+    <div class="bar-row"><span>{{ b.label }}</span><div class="bar">{% if b.n %}<div style="width:{{ b.w }}%; background:{{ b.color }}"></div>{% endif %}</div><strong>{{ b.n }}</strong></div>
+    {% endfor %}
+  </div>
+  {% endif %}
+</div>
+
+<div class="{{ 'page2' if summary }}">
+<h2>Lo primero que arreglaría</h2>
+{% if actions %}
+<ol class="actions">
+{% for a in (actions[:3] if summary else actions) %}
+  <li><div class="action-title">{{ a.plain_title }} <span class="tag imp-{{ a.severity }}">{{ a.impact }}</span></div>
+    <div class="muted">{{ a.plain_why }} · {{ a.count }} {{ 'página' if a.count == 1 else 'páginas' }}{% if a.home %}, incluida la portada{% endif %}</div>
+    <div class="how"><strong>Cómo se arregla:</strong> {{ a.remediation }}</div></li>
+{% endfor %}
+</ol>
+{% else %}<p>No hay nada urgente que arreglar.</p>{% endif %}
+</div>
+{% if summary %}
+<h2>En resumen</h2>
+<p>{% if v == 'good' %}La web está en buen estado: los problemas que quedan son menores y se pueden ir corrigiendo con calma.{% elif v == 'mid' %}La web funciona, pero hay problemas que le restan visibilidad en Google. Arreglar los 3 puntos de arriba es lo que más se notará.{% else %}La web tiene problemas importantes que le hacen perder visibilidad en Google. Conviene arreglar los 3 puntos de arriba cuanto antes.{% endif %}
+  {% if actions | length > 3 %}Hay {{ actions | length - 3 }} mejora(s) más en el informe completo.{% endif %}</p>
+{% else %}
+
+<h2>Los {{ good|length }} puntos básicos</h2>
+<ul class="list">
+{% for g in good %}
+  <li><span class="ic {{ 'ok' if g.ok else 'no' }}">{{ 'Sí' if g.ok else 'No' }}</span><span><strong>{{ g.name }}</strong> · {{ g.label }}</span>
+    {% if not g.ok %}<span class="detail">{{ g.count }} {{ 'página' if g.count == 1 else 'páginas' }}</span>{% endif %}</li>
+{% endfor %}
+</ul>
+
+{% if before_after %}
+<h2>Antes y después</h2>
+<table>
+  <thead><tr><th></th><th class="num">{{ before_after.date }}</th><th class="num">Ahora</th><th></th></tr></thead>
+  <tbody>
+  {% for label, a, b, better in before_after.rows %}
+    {% set good_change = (b > a and better == 'up') or (b < a and better == 'down') %}
+    <tr><td>{{ label }}</td><td class="num">{{ a }}</td><td class="num"><strong>{{ b }}</strong></td>
+      <td>{% if a != b %}<span class="{{ 'delta-up' if good_change else 'delta-down' }}">{{ 'mejor' if good_change else 'peor' }}</span>{% endif %}</td></tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% if before_after.fixed or before_after.new %}
+<div class="two" style="margin-top:14px">
+  <div><strong class="delta-up">Resuelto</strong><ul>{% for t in before_after.fixed %}<li>{{ t }}</li>{% else %}<li class="muted">—</li>{% endfor %}</ul></div>
+  <div><strong class="delta-down">Nuevo</strong><ul>{% for t in before_after.new %}<li>{{ t }}</li>{% else %}<li class="muted">—</li>{% endfor %}</ul></div>
+</div>
+{% endif %}
+{% endif %}
+{% endif %}
+
+{% if journal %}
+<h2>Notas del consultor</h2>
+<ul class="consultant-notes">
+  {% for e in journal %}<li><span class="cn-text">{{ e.text }}</span>
+    {% if e.urls %}<div class="cn-urls">{% for u in e.urls[:6] %}<span>{{ u | replace('https://', '') | replace('http://', '') }}</span>{% endfor %}{% if e.urls|length > 6 %}<span>+{{ e.urls|length - 6 }}</span>{% endif %}</div>{% endif %}</li>{% endfor %}
+</ul>
+{% endif %}
+
+<footer>
+  <span>{{ branding.brand or 'Informe SEO' }}{% if branding.contact %} · {{ branding.contact }}{% endif %}</span>
+  <span>Revisión técnica del {{ date }} · {{ health.urls }} páginas</span>
+</footer>
+</div>
+</body>
+</html>

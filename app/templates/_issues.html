@@ -1,0 +1,40 @@
+<div id="issues">
+  {% if code or show_all %}<p style="margin:0 0 8px"><a href="#" hx-get="/crawls/{{ crawl.id }}/grid?tab=issues" hx-target="#grid" hx-swap="outerHTML">Ver solo los errores</a></p>{% endif %}
+  {% if hidden_groups %}<p class="muted" style="margin:0 0 8px">Solo se muestran fallos que siempre son un error. Hay {{ hidden_groups }} tipos de aviso más que dependen de cada caso:
+    <a href="#" hx-get="/crawls/{{ crawl.id }}/grid?tab=issues&f=_all" hx-target="#grid" hx-swap="outerHTML">ver también los avisos</a>.</p>{% endif %}
+  <div class="row" style="margin-bottom:10px">
+    <button class="{{ '' if not severity else 'secondary' }}" hx-get="/crawls/{{ crawl.id }}/issues" hx-target="#issues" hx-swap="outerHTML">Todas ({{ counts.values() | sum }})</button>
+    {% for sev, n in counts.items() if n %}
+      <button class="{{ '' if severity == sev else 'secondary' }}" hx-get="/crawls/{{ crawl.id }}/issues?severity={{ sev }}" hx-target="#issues" hx-swap="outerHTML">{{ severity_label[sev] }} ({{ n }})</button>
+    {% endfor %}
+    <span class="spinner htmx-indicator"></span>
+  </div>
+  {% if not groups %}
+    <div class="card empty">{% if severity %}No hay incidencias de esta gravedad.{% else %}No se detectaron errores. ¡Buen trabajo! (Revisa igualmente las notas del rastreo.){% endif %}</div>
+  {% endif %}
+  {% for g in groups %}
+    <details class="issue" {% if loop.first %}open{% endif %}>
+      <summary><span class="badge sev-{{ g.severity }}">{{ g.severity_label }}</span><strong>{{ g.title }}</strong><span class="count">{{ g['items'] | length }} URL(s)</span></summary>
+      <div class="body">
+        <p><strong>Por qué importa:</strong> {{ g.why }}</p>
+        <p><strong>Cómo solucionarlo:</strong> {{ g.remediation }}</p>
+        {% if g.clusters %}
+        <div class="clusters"><strong>Agrupadas por patrón de URL:</strong>
+          {% for c in g.clusters %}<span class="cluster" title="{{ c.examples | join('\n') }}"><code>{{ c.pattern }}</code> {{ c.count }} <span class="muted">({{ c.pct }} %)</span></span>{% endfor %}
+          {% if g.clusters[0].pct >= 50 %}<p class="muted" style="margin:6px 0 0">El {{ g.clusters[0].pct }} % sale de <code>{{ g.clusters[0].pattern }}</code>: probablemente se arregla en una sola plantilla o regla.</p>{% endif %}
+        </div>
+        {% endif %}
+        <div class="table-wrap"><table>
+          <thead><tr><th>URL afectada</th><th>Evidencia</th></tr></thead>
+          <tbody>
+          {% for i in g['items'][:200] %}
+            <tr><td class="url"><a href="/crawls/{{ crawl.id }}/page?url={{ quote(i.url, safe='') }}"
+              {% if i.code != 'broken_external' %}hx-get="/crawls/{{ crawl.id }}/detail?src=pages&sub=issues&url={{ quote(i.url, safe='') }}" hx-target="#detail" hx-swap="innerHTML"{% else %}hx-get="/crawls/{{ crawl.id }}/detail?src=externals&sub=inlinks&url={{ quote(i.url, safe='') }}" hx-target="#detail" hx-swap="innerHTML"{% endif %}>{{ i.url }}</a></td><td>{% for part, n in i.evidence|evidence_parts %}{{ part }}{% if n > 1 %} <b class="ev-n">×{{ n }}</b>{% endif %}{% if not loop.last %}; {% endif %}{% endfor %}</td></tr>
+          {% endfor %}
+          </tbody>
+        </table></div>
+        {% if g['items'] | length > 200 %}<p class="muted">Mostrando 200 de {{ g['items'] | length }}. Exporta el CSV de incidencias para ver todas.</p>{% endif %}
+      </div>
+    </details>
+  {% endfor %}
+</div>

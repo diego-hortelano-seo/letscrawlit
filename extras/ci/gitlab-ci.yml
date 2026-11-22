@@ -1,0 +1,16 @@
+# .gitlab-ci.yml job - the JUnit report shows up in the merge request's "Tests" tab.
+seo_check:
+  image: mcr.microsoft.com/playwright/python:v1.49.0-jammy
+  stage: test
+  variables:
+    STAGING_URL: https://staging.example.com/
+  script:
+    - git clone --depth 1 https://github.com/YOUR-USER/letscrawlit.git letscrawlit && cd letscrawlit
+    - python -m pip install -r requirements.txt
+    - python -m app.cli ci "$STAGING_URL" --i-own-this-site --max-urls 500 --fail-on critical,high --junit seo-junit.xml --json seo-result.json
+  artifacts:
+    when: always
+    reports:
+      junit: letscrawlit/seo-junit.xml
+    paths:
+      - letscrawlit/seo-result.json

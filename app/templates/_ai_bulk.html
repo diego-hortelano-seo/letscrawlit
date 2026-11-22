@@ -1,0 +1,52 @@
+<div id="ai-bulk" {% if job and job.running %}hx-get="/crawls/{{ crawl.id }}/ai/bulk" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
+  {% if job and job.running %}
+    <p><span class="spinner"></span> <strong>{{ job.label }}</strong>: {{ job.done }} de {{ job.total }} páginas
+      {% if job.errors %}<span class="err">· {{ job.errors }} error(es)</span>{% endif %} · {{ job.provider }} · {{ job.model }}</p>
+    <div class="progress"><div style="width:{{ (100 * job.done / job.total)|round }}%"></div></div>
+    <p><button type="button" class="secondary mini" hx-post="/crawls/{{ crawl.id }}/ai/bulk/cancel" hx-target="#ai-bulk" hx-swap="outerHTML">Detener</button>
+      <span class="muted">Los resultados aparecen en la pestaña «IA» según llegan.</span></p>
+  {% else %}
+    {% if job %}<div class="alert {{ 'error' if job.last_error else 'info' }}">Última tarea: <strong>{{ job.label }}</strong>, {{ job.done }} de {{ job.total }} páginas{% if job.errors %}, {{ job.errors }} error(es): {{ job.last_error }}{% endif %}.
+      <a href="/crawls/{{ crawl.id }}?tab=ai">Ver la pestaña IA</a></div>{% endif %}
+    {% if message %}<div class="alert error" role="alert">{{ message }}</div>{% endif %}
+    {% if ok %}<div class="alert ok" role="status">{{ ok }}</div>{% endif %}
+    <form hx-post="/crawls/{{ crawl.id }}/ai/bulk" hx-target="#ai-bulk" hx-swap="outerHTML" hx-include="#grid-state">
+      <p class="ai-step">1. ¿Qué quieres que haga la IA en cada página?</p>
+      <div class="ai-tasks">
+        {% for k, (icon, name, what, example) in cards.items() %}
+        <label class="ai-task"><input type="radio" name="task" value="{{ k }}" {% if k == task %}checked{% endif %} data-change="aiTask" data-args='["$this"]'>
+          <span><strong>{{ name }}</strong><span class="ai-task-what">{{ what }}</span>
+            <span class="ai-task-ex">Ejemplo: «{{ example }}»</span></span></label>
+        {% endfor %}
+        {% for p in saved_prompts %}
+        <label class="ai-task saved"><input type="radio" name="task" value="saved:{{ p.id }}" {% if task == 'saved:' ~ p.id %}checked{% endif %} data-change="aiTask" data-args='["$this"]'>
+          <span><strong>{{ p.name }}</strong><span class="ai-task-what">{{ p.prompt | truncate(140) }}</span>
+            <span class="ai-task-ex">Instrucción guardada</span></span>
+          <button type="button" class="ai-task-del" title="Borrar esta instrucción guardada" aria-label="Borrar «{{ p.name }}»"
+                  hx-post="/crawls/{{ crawl.id }}/ai/prompts/{{ p.id }}/delete" hx-target="#ai-bulk" hx-swap="outerHTML"
+                  hx-confirm="¿Borrar la instrucción guardada «{{ p.name }}»?">Borrar</button></label>
+        {% endfor %}
+      </div>
+      <div class="ai-custom" id="bulk-prompt-wrap" {% if task != 'custom' %}hidden{% endif %}>
+        <label for="bulk-prompt">Tu instrucción <span class="muted">(la IA la aplica a cada página, con su título, H1, descripción y texto)</span></label>
+        <textarea id="bulk-prompt" name="prompt" rows="3" maxlength="2000" placeholder="¿Esta página menciona precios? Responde sí o no.">{{ prompt }}</textarea>
+        <div class="ai-save">
+          <input type="text" name="prompt_name" maxlength="60" placeholder="Nombre para guardarla, p. ej. «¿Tiene precios?»" aria-label="Nombre de la instrucción">
+          <button type="button" class="secondary mini" hx-post="/crawls/{{ crawl.id }}/ai/prompts" hx-target="#ai-bulk" hx-swap="outerHTML" hx-include="closest form, #grid-state">Guardar para otras auditorías</button>
+        </div>
+      </div>
+      {% if ai.enabled %}
+      <p class="muted">Se aplicará a las <strong>{{ count if count is not none else '…' }}</strong> páginas HTML de la vista actual (pestaña, filtro y búsqueda), como mucho {{ max_pages }}.
+        Una petición por página a {{ ai.provider }} ({{ ai.model }}){% if ai.provider != 'ollama' %}: el texto de cada página sale de tu equipo y tiene coste según tu plan{% endif %}.</p>
+      <div class="ai-actions">
+        <button type="submit" class="mini" {% if not count %}disabled{% endif %}>Empezar</button>
+        <button type="button" class="secondary mini" data-click="openAiSetup">Cambiar de IA</button>
+      </div>
+      {% endif %}
+    </form>
+    {% if not ai.enabled %}
+    <p class="ai-step">2. Activa la IA <span class="muted">(solo la primera vez)</span></p>
+    <div hx-get="/ai/setup" hx-trigger="load" hx-swap="outerHTML"><span class="spinner"></span></div>
+    {% endif %}
+  {% endif %}
+</div>

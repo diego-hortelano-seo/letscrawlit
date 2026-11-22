@@ -1,0 +1,22 @@
+{% if error %}<div class="alert error" role="alert">{{ error }}</div>
+{% elif not data or not data.entries %}<div class="empty">No se registró ninguna petición.</div>
+{% else %}
+  {% set total = data.total_ms %}
+  <p class="muted">{{ data.requests }} peticiones · {{ (data.bytes / 1024)|round(1) }} KB · carga completa en {{ total }} ms
+    {% if data.perf.ttfb %} · TTFB {{ data.perf.ttfb }} ms{% endif %}{% if data.perf.dcl %} · DOMContentLoaded {{ data.perf.dcl }} ms{% endif %}
+    {% if data.perf.load %} · load {{ data.perf.load }} ms{% endif %} · navegador {{ data.engine }}</p>
+  <div class="wf">
+    <div class="wf-row wf-head"><span>Recurso</span><span>Tipo</span><span>Código</span><span>KB</span><span>ms</span><span class="wf-axis">0 ms <b style="float:right">{{ total }} ms</b></span></div>
+    {% for e in data.entries %}
+      <div class="wf-row" title="{{ e.url }}">
+        <span class="wf-url">{{ e.url.split('?')[0].rsplit('/', 1)[-1] or e.url }}</span>
+        <span>{{ e.type }}</span>
+        <span class="c{{ (e.status // 100) if e.status else 0 }}">{{ e.status or '–' }}</span>
+        <span class="n">{{ ((e.size or 0) / 1024)|round(1) }}</span>
+        <span class="n">{{ e.duration_ms }}</span>
+        <span class="wf-track"><span class="wf-bar wf-{{ e.type }}" style="left: {{ (100 * e.begin_ms / total)|round(2) }}%; width: {{ [100 * e.duration_ms / total, 0.4]|max|round(2) }}%"></span></span>
+      </div>
+    {% endfor %}
+  </div>
+  <p class="muted">Las barras más largas o que empiezan tarde son tus cuellos de botella: scripts que bloquean, imágenes pesadas o fuentes.</p>
+{% endif %}

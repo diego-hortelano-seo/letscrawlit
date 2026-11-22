@@ -1,0 +1,7 @@
+{% if error %}<div class="alert error" role="alert">{{ error }}</div>{% endif %}
+{% for r in results or [] %}
+  <div class="card" style="margin:8px 0; padding:10px">
+    <div class="muted" style="font-size:12px">{{ tasks[r.task][0] if r.task in tasks else r.task }} · {{ r.model }} · {{ r.created_at[:16].replace('T', ' ') }} UTC</div>
+    <pre style="margin:6px 0 0; max-height:none">{{ r.result }}</pre>
+  </div>
+{% endfor %}

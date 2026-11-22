@@ -1,0 +1,70 @@
+{% extends "base.html" %}
+{% block title %}Perspectivas · LetsCrawlit{% endblock %}
+{% block content %}
+<p><a href="/crawls/{{ crawl.id }}">Volver a la auditoría</a></p>
+<h1>Qué arreglar primero <span class="h-site">{{ crawl.start_url | replace('https://', '') | replace('http://', '') | trim('/') }}</span></h1>
+
+<p class="muted"><span>{{ health.clean_urls }} de {{ health.urls }} URLs sin problemas</span> · <span>Orden: gravedad, nº de URLs afectadas y si tocan la página de inicio o las URLs más enlazadas.</span></p>
+
+{% if health.actions %}
+<div class="card table-wrap" style="padding:0"><table class="dg" style="width:100%">
+  <thead><tr><th>#</th><th>Tarea</th><th>Gravedad</th><th>URLs</th><th>Por qué ahora</th><th>Cómo</th></tr></thead>
+  <tbody>{% for a in health.actions[:30] %}
+    <tr><td class="n">{{ loop.index }}</td>
+      <td><a href="/crawls/{{ crawl.id }}?tab=issues&f={{ a.code }}">{{ a.title }}</a></td>
+      <td><span class="badge sev-{{ a.severity }}">{{ a.severity_label }}</span></td>
+      <td class="n">{{ a.count }}</td>
+      <td style="white-space:normal">{{ a.reasons|join(' · ') }}</td>
+      <td style="white-space:normal; max-width:380px">{{ a.remediation }}</td></tr>
+  {% endfor %}</tbody></table></div>
+{% else %}<div class="card empty">Nada que arreglar.</div>{% endif %}
+
+<h2>Sugerencias de enlazado interno</h2>
+<p class="muted">Páginas que tratan el mismo tema pero no se enlazan. Se propone una frase del texto de origen que ya menciona el tema de la página destino, para usarla como ancla.</p>
+{% if suggestions %}
+<div class="card table-wrap" style="padding:0"><table class="dg" style="width:100%">
+  <thead><tr><th>En la página…</th><th>enlaza a…</th><th>Ancla sugerida</th><th>Frase donde ponerla</th><th>Similitud</th></tr></thead>
+  <tbody>{% for s in suggestions %}
+    <tr><td title="{{ s.source }}">{{ s.source }}</td><td title="{{ s.target }} · {{ s.target_title }}">{{ s.target }}</td>
+      <td><strong>{{ s.anchor }}</strong></td><td style="white-space:normal; max-width:420px">{{ s.sentence }}</td><td class="n">{{ (s.similarity * 100)|round|int }} %</td></tr>
+  {% endfor %}</tbody></table></div>
+{% else %}<div class="card empty">Sin sugerencias: o las páginas relacionadas ya se enlazan, o hay poco texto para comparar.</div>{% endif %}
+
+<h2>Clústeres semánticos</h2>
+{% if clusters %}
+<div class="grid">{% for c in clusters[:30] %}
+  <div class="card"><strong>{{ c.label }}</strong> <span class="muted">· {{ c.size }} páginas</span>
+    <div class="muted" style="font-size:12px; margin:4px 0">{{ c.terms|join(', ') }}</div>
+    <ul style="margin:0; padding-left:18px; font-size:12.5px">{% for u in c.urls[:8] %}<li style="word-break:break-all">{{ u }}</li>{% endfor %}{% if c.size > 8 %}<li class="muted">y {{ c.size - 8 }} más</li>{% endif %}</ul>
+  </div>{% endfor %}</div>
+{% else %}<div class="card empty">No se formaron grupos (pocas páginas o temas muy distintos).</div>{% endif %}
+
+<h2>Contenido casi duplicado</h2>
+{% if near %}
+<div class="card table-wrap" style="padding:0"><table class="dg" style="width:100%">
+  <thead><tr><th>URL</th><th>Más parecida a</th><th>Similitud</th><th>Nº de casi duplicados</th></tr></thead>
+  <tbody>{% for u, other, sim, n in near %}<tr><td title="{{ u }}">{{ u }}</td><td title="{{ other }}">{{ other }}</td><td class="n">{{ (sim * 100)|round(1) }} %</td><td class="n">{{ n }}</td></tr>{% endfor %}</tbody>
+</table></div>
+{% else %}<div class="card empty">No hay páginas casi duplicadas por encima del umbral configurado.</div>{% endif %}
+
+<h2>Plagio externo</h2>
+<div class="card">
+  <p class="muted" style="margin-top:0">¿Sospechas que otra web copió tu texto? Pega aquí el texto de esa web y lo comparamos con todas tus páginas (sin visitar la otra web).</p>
+  <form hx-post="/crawls/{{ crawl.id }}/plagiarism" hx-target="#plag-result" hx-swap="outerHTML" method="post" action="/crawls/{{ crawl.id }}/plagiarism">
+    <textarea name="text" rows="6" style="width:100%" aria-label="Texto sospechoso" placeholder="Pega aquí el texto de la otra web…"></textarea>
+    <p><button type="submit">Comparar con mis páginas</button></p>
+  </form>
+  <div id="plag-result"></div>
+  <hr style="border:0; border-top:1px solid var(--border); margin:14px 0">
+  {% if copyscape %}
+    <p class="muted">Buscar copias de una de tus páginas en toda la web con Copyscape (tu cuenta, de pago):</p>
+    <form class="row" method="post" action="/crawls/{{ crawl.id }}/copyscape" hx-post="/crawls/{{ crawl.id }}/copyscape" hx-target="#cs-result">
+      <input type="url" name="url" value="{{ crawl.start_url }}" style="max-width:480px" aria-label="URL a comprobar">
+      <button type="submit" class="secondary">Buscar copias</button>
+    </form>
+    <div id="cs-result"></div>
+  {% else %}
+    <p class="muted">Para buscar copias en toda la web automáticamente añade <code>COPYSCAPE_USER</code> y <code>COPYSCAPE_KEY</code> en <code>.env</code> (servicio de pago, con tu propia cuenta).</p>
+  {% endif %}
+</div>
+{% endblock %}

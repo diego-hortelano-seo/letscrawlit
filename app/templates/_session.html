@@ -1,0 +1,19 @@
+<div id="session-box" {% if rec.status in ('starting', 'recording') %}hx-get="/sessions/status" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
+  {% if rec.status in ('starting', 'recording') %}
+    <p class="card" style="margin:6px 0; padding:10px 12px"><span class="spinner"></span> <strong>Grabando {{ rec.site }}.</strong> {{ rec.message }}</p>
+    <button type="button" class="mini" hx-post="/sessions/save" hx-target="#session-box" hx-swap="outerHTML">Guardar sesión</button>
+    <button type="button" class="secondary mini" hx-post="/sessions/cancel" hx-target="#session-box" hx-swap="outerHTML">Cancelar</button>
+  {% else %}
+    <button type="button" class="mini" hx-post="/sessions/record" hx-include="#url" hx-target="#session-box" hx-swap="outerHTML">
+      Abrir navegador para iniciar sesión</button>
+    <span class="muted">en la URL escrita arriba</span>
+    {% if rec.message %}<p class="{{ 'err' if rec.status == 'error' else 'muted' }}" style="margin:6px 0">{{ rec.message }}</p>{% endif %}
+  {% endif %}
+  {% if saved %}
+  <table class="dg" style="margin-top:10px; width:100%">
+    <thead><tr><th>Sitio</th><th>Grabada (UTC)</th><th>Cookies</th><th>Caduca</th><th></th></tr></thead>
+    <tbody>{% for s in saved %}<tr><td>{{ s.site }}</td><td>{{ s.saved_at }}</td><td class="n">{{ s.cookies }}</td><td>{{ s.expires or 'al cerrar sesión' }}</td>
+      <td><button type="button" class="secondary mini" hx-post="/sessions/delete" hx-vals='{{ {"site": s.site} | tojson }}' hx-target="#session-box" hx-swap="outerHTML">Borrar</button></td></tr>{% endfor %}</tbody>
+  </table>
+  {% endif %}
+</div>

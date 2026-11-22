@@ -1,0 +1,12 @@
+.env
+.venv/
+data/
+__pycache__/
+*.pyc
+.pytest_cache/
+.claude/
+build/
+dist/
+*.spec.bak
+window/
+CAMBIOS.md

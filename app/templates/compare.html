@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}Comparar auditorías · LetsCrawlit{% endblock %}
+{% block content %}
+<h1>Comparar auditorías</h1>
+<form class="card row" method="get" action="/compare" style="align-items:flex-end">
+  <div style="flex:1; min-width:240px"><label for="a">Antes</label>
+    <select id="a" name="a">{% for c in crawls %}<option value="{{ c.id }}" {% if c.id == a %}selected{% endif %}>{{ c.start_url }} · {{ c.created_at[:16].replace('T', ' ') }}</option>{% endfor %}</select></div>
+  <div style="flex:1; min-width:240px"><label for="b">Después</label>
+    <select id="b" name="b">{% for c in crawls %}<option value="{{ c.id }}" {% if c.id == b or (not b and loop.first) %}selected{% endif %}>{{ c.start_url }} · {{ c.created_at[:16].replace('T', ' ') }}</option>{% endfor %}</select></div>
+  <button type="submit">Comparar</button>
+</form>
+<p class="muted">Útil para comparar meses distintos o staging frente a producción (rastrea cada entorno por separado).</p>
+{% if result %}
+<div class="grid">
+  <div class="card"><div class="muted">URLs antes y después</div><div class="stat">{{ result.a_count }} / {{ result.b_count }}</div></div>
+  <div class="card"><div class="muted">Nuevas</div><div class="stat">{{ result.added|length }}</div></div>
+  <div class="card"><div class="muted">Eliminadas</div><div class="stat">{{ result.removed|length }}</div></div>
+  <div class="card"><div class="muted">Cambios</div><div class="stat">{{ result.changes|length }}</div></div>
+</div>
+<h2>Incidencias</h2>
+<div class="card table-wrap" style="padding:0"><table class="dg" style="width:100%">
+  <thead><tr><th>Incidencia</th><th>Antes</th><th>Después</th><th>Diferencia</th></tr></thead>
+  <tbody>{% for i in result.issues %}<tr><td>{{ i.title }}</td><td class="n">{{ i.before }}</td><td class="n">{{ i.after }}</td>
+    <td class="n {{ 'c4' if i.delta > 0 else ('c2' if i.delta < 0 else '') }}">{{ '+' if i.delta > 0 }}{{ i.delta }}</td></tr>{% endfor %}</tbody></table></div>
+<h2>Cambios por URL</h2>
+{% if result.changes %}<div class="card table-wrap" style="padding:0"><table class="dg" style="width:100%">
+  <thead><tr><th>URL</th><th>Campo</th><th>Antes</th><th>Después</th></tr></thead>
+  <tbody>{% for c in result.changes[:1000] %}<tr><td title="{{ c.url }}">{{ c.url }}</td><td>{{ c.field }}</td><td title="{{ c.before }}">{{ c.before if c.before is not none else '–' }}</td><td title="{{ c.after }}">{{ c.after if c.after is not none else '–' }}</td></tr>{% endfor %}</tbody></table></div>
+{% else %}<div class="card empty">Sin cambios en las URLs comunes.</div>{% endif %}
+<div class="grid" style="margin-top:16px">
+  <div><h2>URLs nuevas</h2><div class="card"><ul style="margin:0; padding-left:18px">{% for u in result.added[:500] %}<li style="word-break:break-all">{{ u }}</li>{% else %}<li class="muted">Ninguna</li>{% endfor %}</ul></div></div>
+  <div><h2>URLs eliminadas</h2><div class="card"><ul style="margin:0; padding-left:18px">{% for u in result.removed[:500] %}<li style="word-break:break-all">{{ u }}</li>{% else %}<li class="muted">Ninguna</li>{% endfor %}</ul></div></div>
+</div>
+{% elif crawls|length < 2 %}<div class="card empty">Necesitas al menos dos auditorías terminadas.</div>{% endif %}
+{% endblock %}

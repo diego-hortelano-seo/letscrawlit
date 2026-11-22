@@ -1,0 +1,85 @@
+{% macro gurl(t=tab.key, ff=f, qq=q, s=sort, d=dir, p=1) -%}
+/crawls/{{ crawl.id }}/grid?tab={{ t }}&f={{ ff }}&q={{ quote(qq or '') }}&sort={{ s }}&dir={{ d }}&page={{ p }}
+{%- endmacro %}
+<div id="grid" data-src="{{ gurl() }}"
+     {% if active %}hx-get="{{ gurl() }}" hx-trigger="every 3s" hx-swap="outerHTML"{% endif %}>
+  <div class="tabrow">
+  <nav class="tabbar" role="tablist">
+    {% for t in tabs %}
+      <a class="{{ 'on' if t.key == tab.key }}" role="tab" href="/crawls/{{ crawl.id }}?tab={{ t.key }}"
+         {% if t.key != 'issues' and t.key != tab.key %}data-tab="{{ t.key }}"{% endif %}
+         hx-get="{{ gurl(t=t.key, ff='', qq='', s='', d='asc') }}" hx-target="#grid" hx-swap="outerHTML">{{ t.label }}</a>
+    {% endfor %}
+  </nav>
+  <label class="simple-sw" title="Muestra solo lo esencial: URLs, códigos de respuesta, títulos, H1 y problemas"><input type="checkbox" class="simple-toggle" data-change="setSimple" data-args='["$checked"]'> Modo principiante</label>
+  <details class="menu tab-chooser">
+    <summary class="tab-chooser-btn" title="Configurar pestañas">Pestañas</summary>
+    <div class="menu-list">
+      <button type="button" data-click="resetTabs">Restablecer pestañas</button>
+      {% for t in tabs if t.key != 'issues' %}
+        <label class="check"><input type="checkbox" data-tab="{{ t.key }}" checked data-change="toggleTab" data-args='["$this"]'> {{ t.label }}</label>
+      {% endfor %}
+    </div>
+  </details>
+  </div>
+  {% if tab.source == 'issues' %}
+    <div class="filterbar"><button type="button" class="secondary mini jn-btn" id="jn-btn" data-total="{{ jn.total if jn else 0 }}" data-click="toggleJournal" title="Todas tus notas de URLs de esta web">Notas{% if jn and jn.total %} ({{ jn.total }}){% endif %}</button></div>
+    {% include "_issues.html" %}
+  {% else %}
+  <form class="filterbar" action="/crawls/{{ crawl.id }}/grid" hx-get="/crawls/{{ crawl.id }}/grid" hx-target="#grid" hx-swap="outerHTML"
+        hx-trigger="change from:select, input changed delay:300ms from:input[type=search], submit">
+    <input type="hidden" name="tab" value="{{ tab.key }}"><input type="hidden" name="sort" value="{{ sort }}"><input type="hidden" name="dir" value="{{ dir }}">
+    <label class="sr-only" for="flt">Filtro</label>
+    <select id="flt" name="f">
+      <option value="">Todas</option>
+      {% for key, label, _ in tab.filters %}<option value="{{ key }}" {% if key == f %}selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    {% set th = tab_help(tab.key) %}{% if th %}<span class="qhelp qtab" tabindex="0" role="button" aria-label="¿Qué muestra esta pestaña?" data-h1="Qué muestra" data-h2="Por qué importa" data-why="{{ th.why }}" data-fix="{{ th.fix }}">?</span>{% endif %}
+    {% if fhelp %}<span class="qhelp" tabindex="0" role="button" aria-label="¿Qué significa este filtro?" data-why="{{ fhelp.why }}" data-fix="{{ fhelp.fix }}">?</span>{% endif %}
+    <input type="search" name="q" value="{{ q }}" placeholder="Buscar en {{ tab.columns[0][1]|lower }}…" aria-label="Buscar">
+    <noscript><button class="mini" type="submit">Filtrar</button></noscript>
+    <span class="total">{{ total }} fila(s)</span>
+    <span class="spinner htmx-indicator"></span>
+    <span class="spacer" style="flex:1"></span>
+    <button type="button" class="secondary mini multi-btn" id="multi-btn" aria-pressed="false" data-click="toggleMulti"
+      title="Activa para marcar varias URLs con un clic cada una. También: Ctrl+clic suma una fila y Mayús+clic un rango. Esc deselecciona">Seleccionar varias</button>
+    <button type="button" class="mini" id="copy-sel-btn" hidden data-click="copySelected" title="Copiar las URLs seleccionadas, una por línea">Copiar URLs</button>
+    <button type="button" class="mini jn-url-btn" id="jn-url-btn" hidden data-click="journalForSelected" title="Escribir un apunte sobre la URL seleccionada">Apuntar</button>
+    <button type="button" class="secondary mini jn-btn" id="jn-btn" data-total="{{ jn.total if jn else 0 }}" data-click="toggleJournal" title="Todas tus notas de URLs de esta web">Notas{% if jn and jn.total %} ({{ jn.total }}){% endif %}</button>
+    {% if tab.source == 'pages' and not active %}<button type="button" class="secondary mini" data-click="openBulk" title="Aplicar una tarea de IA a todas las filas de esta vista">IA en bloque</button>{% endif %}
+    <span id="grid-state" hidden><input type="hidden" name="tab" value="{{ tab.key }}" form="none"><input type="hidden" name="f" value="{{ f }}" form="none"><input type="hidden" name="q" value="{{ q }}" form="none"></span>
+    <details class="exp-menu"><summary class="btn secondary mini" title="Descargar lo que ves">Exportar</summary>
+      <div class="mb-list exp-list">
+        <a class="mi" href="/crawls/{{ crawl.id }}/export/view.csv?tab={{ tab.key }}&f={{ f }}&q={{ quote(q or '') }}&sort={{ sort }}&dir={{ dir }}">Esta vista en CSV<small>las filas de la pestaña, el filtro y la búsqueda actuales</small></a>
+        {% if not active %}<a class="mi" href="/crawls/{{ crawl.id }}/client-report/pdf?summary=1" data-click="openDownload" data-args="[1]">Exportar resumen<small>PDF de dos páginas para un cliente o un jefe</small></a>{% endif %}
+      </div></details>
+  </form>
+  <div class="grid-scroll">
+    {% if rows %}
+    <table class="dg">
+      <thead><tr>
+        <th class="n">#</th>
+        {% for key, label in tab.columns %}
+          <th class="{{ 'sorted' if key == sort }}" hx-get="{{ gurl(s=key, d=('desc' if key == sort and dir == 'asc' else 'asc')) }}"
+              hx-target="#grid" hx-swap="outerHTML" title="Ordenar por {{ label }}">{{ label }}{% if key == sort %} {{ '▲' if dir == 'asc' else '▼' }}{% endif %}</th>
+        {% endfor %}
+      </tr></thead>
+      <tbody>
+      {% include '_grid_rows.html' %}
+      </tbody>
+    </table>
+    {% elif active %}
+      <div class="empty"><span class="spinner"></span> Rastreando… las filas aparecerán aquí en cuanto haya datos.</div>
+    {% elif tab.key == 'external' and not crawl.settings.check_external %}
+      <div class="empty">No se encontraron enlaces externos{% if not crawl.settings.check_external %}, o no se activó «Comprobar enlaces externos» en este rastreo{% endif %}.</div>
+    {% else %}
+      {% if crawl.status in ('failed', 'interrupted') and not total %}
+      <div class="fail-box" role="alert"><h3>Este rastreo no ha podido terminar</h3>
+        <p>{{ crawl.error or 'El rastreo se cortó antes de tiempo.' }}</p>
+        <p class="muted">Comprueba que la dirección abre en el navegador y vuelve a intentarlo con «Rastrear». Si sigue fallando, mira Ayuda › Si algo sale mal.</p></div>
+      {% else %}<div class="big-empty">Ningún dato</div>{% endif %}
+    {% endif %}
+  </div>
+  <div class="statusline"><span class="sel-count">Ninguna URL seleccionada</span> · <span>{{ total }} URLs en esta vista</span></div>
+  {% endif %}
+</div>

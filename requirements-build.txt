@@ -1,0 +1,2 @@
+# Only to build the Windows program (LetsCrawlit.exe): pip install -r requirements-build.txt
+pyinstaller>=6.10,<7

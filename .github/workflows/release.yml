@@ -1,0 +1,65 @@
+# Builds the Windows program and attaches it to a GitHub Release.
+# Run it by pushing a version tag:  git tag v0.3.0  &&  git push origin v0.3.0
+name: Programa para Windows
+
+on:
+  push:
+    tags: ["v*"]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt -r requirements-build.txt
+          python -m playwright install chromium
+
+      - name: Pruebas
+        run: python -m pytest -q
+
+      - name: Crear LetsCrawlit.exe
+        run: python -m PyInstaller --noconfirm --clean letscrawl.spec
+
+      - name: Crear el instalador
+        shell: pwsh
+        run: |
+          choco install innosetup -y --no-progress
+          $v = (Select-String -Path app/config.py -Pattern '^VERSION = "(.+)"').Matches[0].Groups[1].Value
+          & "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe" /Q "/DMyVersion=$v" packaging/letscrawl.iss
+          if ($LASTEXITCODE) { exit $LASTEXITCODE }
+          Copy-Item "dist/LetsCrawlit-Setup-$v.exe" LetsCrawlit-Setup.exe
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: LetsCrawlit-Setup
+          path: LetsCrawlit-Setup.exe
+
+      - name: Publicar en Releases
+        if: startsWith(github.ref, 'refs/tags/')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: LetsCrawlit-Setup.exe
+          body: |
+            **LetsCrawlit**: auditorías SEO técnicas desde tu ordenador. Gratis, de código abierto y sin cuentas.
+
+            ## Descargar e instalar (Windows 10 y 11)
+            1. Descarga **LetsCrawlit-Setup.exe** (abajo, en «Assets») y ábrelo.
+            2. Sigue el asistente: se instala en un minuto, sin permisos de administrador,
+               y deja LetsCrawlit en el menú Inicio y en el escritorio.
+            3. Si Windows avisa «Windows protegió su PC», pulsa **Más información › Ejecutar de todas formas**
+               (el programa aún no está firmado).
+
+            Para actualizar, instala la versión nueva encima: tus rastreos, notas y claves están en
+            `%APPDATA%\LetsCrawlit` y no se pierden. Se desinstala desde Configuración › Aplicaciones.
