@@ -3,11 +3,11 @@
 {% set cur = request.cookies.get('lang', 'es') if request is defined and request else 'es' %}
 {% set cur = cur if cur in ['es', 'en', 'fr', 'it', 'pt', 'de'] else 'es' %}
 <details class="lang-sw" role="group" aria-label="Idioma de la interfaz">
-  <summary title="Idioma de la interfaz">Idioma</summary>
+  <summary title="Idioma de la interfaz"><img class="lang-flag" src="/static/flags/{{ cur }}.svg" alt="" width="18" height="12">Idioma</summary>
   <div class="lang-menu">
     {% for code, name in langs %}
     <a href="/lang/{{ code }}" hreflang="{{ code }}" lang="{{ code }}" title="{{ name }}" class="{{ 'on' if code == cur }}"
-       {% if code == cur %}aria-current="true"{% endif %} data-click="langGo" data-args='["{{ code }}"]'>{{ name }}</a>
+       {% if code == cur %}aria-current="true"{% endif %} data-click="langGo" data-args='["{{ code }}"]'><img class="lang-flag" src="/static/flags/{{ code }}.svg" alt="" width="18" height="12">{{ name }}</a>
     {% endfor %}
   </div>
 </details>

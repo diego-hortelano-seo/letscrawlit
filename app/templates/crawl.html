@@ -6,7 +6,7 @@
 {% include "_menubar.html" %}
 {% if request.query_params.get('cfg_saved') %}<div class="cfg-saved-note" role="status">Configuración guardada. Se usará en los próximos rastreos.</div>{% endif %}
 <div class="urlbar">
-  <a class="ub-brand" href="/" title="Nueva auditoría"><span class="brand-pill">Lets</span>Crawlit</a>
+  <a class="ub-brand" href="/" title="Nueva auditoría"><img class="brand-logo" src="/static/logo-oscuro.svg" alt="LetsCrawlit" width="135" height="28"></a>
   <div class="ub-url" title="{{ crawl.start_url }}">
     <input type="text" value="{{ crawl.start_url }}{% if crawl.settings.mode == 'list' and (crawl.settings.urls or [])|length > 1 %} (+{{ crawl.settings.urls|length - 1 }} URLs){% endif %}" readonly aria-label="URL rastreada"></div>
   <span class="ub-mode">{{ 'Lista' if crawl.settings.mode == 'list' else ('Subdominios incluidos' if crawl.settings.crawl_subdomains else 'Sitio web') }}</span>

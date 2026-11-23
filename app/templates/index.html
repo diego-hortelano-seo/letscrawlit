@@ -68,7 +68,7 @@
   <input type="hidden" name="preset" id="preset" value="">
   {% set mode = form.mode or 'spider' %}
   <div class="urlbar">
-    <a class="ub-brand" href="/" title="Nueva auditoría"><span class="brand-pill">Lets</span>Crawlit</a>
+    <a class="ub-brand" href="/" title="Nueva auditoría"><img class="brand-logo" src="/static/logo-oscuro.svg" alt="LetsCrawlit" width="135" height="28"></a>
     <select class="ub-select" id="mode" name="mode" data-change="setMode" data-args='["$value"]' aria-label="Modo de rastreo">
       <option value="spider" {% if mode == 'spider' %}selected{% endif %}>Sitio web</option>
       <option value="list" {% if mode == 'list' %}selected{% endif %}>Lista</option>

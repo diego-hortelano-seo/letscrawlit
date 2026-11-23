@@ -164,10 +164,10 @@ async def same_origin_posts(request: Request, call_next):
 
 
 LOGIN_PAGE = """<!doctype html><html lang="es"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Entrar · LetsCrawlit</title><link rel="stylesheet" href="/static/style.css"></head>
+<title>Entrar · LetsCrawlit</title><link rel="icon" href="/static/icono-app.svg" type="image/svg+xml"><link rel="stylesheet" href="/static/style.css"></head>
 <body style="display:grid;place-items:center;min-height:100vh;background:#f9f6fe">
 <form method="post" action="/login" class="card" style="width:min(360px,calc(100vw - 32px));padding:24px">
-<h1 style="margin:0 0 6px;font-size:22px"><span class="brand-pill">Lets</span>Crawlit</h1>
+<h1 style="margin:0 0 10px"><img src="/static/logo-claro.svg" alt="LetsCrawlit" width="173" height="36"></h1>
 <p class="muted" style="margin:0 0 14px">Escribe la contraseña de LetsCrawlit (LETSCRAWL_PASSWORD en .env).</p>
 {error}<input type="hidden" name="next" value="{next}">
 <input type="password" name="password" aria-label="Contraseña" autofocus required style="width:100%">
