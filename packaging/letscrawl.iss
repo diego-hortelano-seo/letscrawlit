@@ -1,4 +1,4 @@
-; Windows installer for LetsCrawlit (Inno Setup 6):  iscc /DMyVersion=0.3.1 packaging\letscrawl.iss
+; Windows installer for LetsCrawlit (Inno Setup 6):  iscc /DMyVersion=1.0.0 packaging\letscrawl.iss
 ; Packs dist\LetsCrawlit (built by PyInstaller) into one file: dist\LetsCrawlit-Setup-<version>.exe
 
 #ifndef MyVersion

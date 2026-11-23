@@ -474,7 +474,7 @@ Para guardar o mover una auditoría completa (y poder reanudarla), usa «Exporta
 | `LETSCRAWL_ALLOWED_HOSTS` | (vacío) | Nombres extra con los que se puede abrir la app (p. ej. `mi-portatil.local`); por defecto solo `localhost` y direcciones IP |
 | `LETSCRAWL_OPEN_BROWSER` | `1` | Abrir el navegador al arrancar |
 | `LETSCRAWL_DATA_DIR` | `data` | Carpeta de datos |
-| `LETSCRAWL_USER_AGENT` | `LetsCrawlit/0.3.0` | User-Agent (también para robots.txt) |
+| `LETSCRAWL_USER_AGENT` | `LetsCrawlit/1.0.0` | User-Agent (también para robots.txt) |
 | `LETSCRAWL_DEFAULT_MAX_URLS` / `LETSCRAWL_MAX_URLS_LIMIT` | `0` / `0` | Tope por defecto y tope de seguridad (0 = sin límite) |
 | `LETSCRAWL_DEFAULT_DELAY` / `LETSCRAWL_MIN_DELAY` | `1.0` / `0.2` | Pausa por defecto y mínima (s) |
 | `LETSCRAWL_RENDER_TIMEOUT` | `20` | Tiempo máximo de renderizado por página (s) |
