@@ -66,8 +66,13 @@ Cuando haya una versión nueva, la app te lo dirá con un aviso. Para actualizar
 | <img src="docs/img/inicio.png" alt="Pantalla de inicio: ¿Qué quieres revisar?" width="440"> | <img src="docs/img/errores.png" alt="Lista de errores con explicación" width="440"> |
 | **Modo claro** | **Informe para el cliente** |
 | <img src="docs/img/claro.png" alt="LetsCrawlit en modo claro" width="440"> | <img src="docs/img/informe.png" alt="Informe para el cliente en lenguaje sencillo" width="440"> |
+| **La IA propone title, description y datos estructurados** | **Anotar varias URLs a la vez** |
+| <img src="docs/img/ia.png" alt="Pestaña IA: title y description actuales junto a los propuestos, y la propuesta completa con botones de copiar" width="440"> | <img src="docs/img/anotar.png" alt="Ventana Anotar: los problemas que comparten las URLs elegidas, con su gravedad, y frases rápidas" width="440"> |
+| **Ficha de cliente para la IA** | |
+| <img src="docs/img/cliente.png" alt="Ficha de cliente: identidad, voz y estilo, y contexto del negocio" width="440"> | |
 
-Las capturas son de una web de prueba local con errores a propósito (`extras/demo/demo_site.py`).
+Las capturas son de una web de prueba local con errores a propósito (`extras/demo/demo_site.py`). Las propuestas
+de la IA son reales (Groq, `openai/gpt-oss-20b`) con la ficha de cliente de la captura.
 
 ## Guías
 
