@@ -1,4 +1,4 @@
-{# «Notas»: every note written with «Apuntar» in this audit (a new audit starts empty). Loaded into the drawer. #}
+{# «Notas»: every note written with «Anotar» in this audit (a new audit starts empty). Loaded into the drawer. #}
 {% macro post(e, vals) -%}
 hx-post="/crawls/{{ crawl.id }}/journal/{{ e.id }}" hx-target="#journal-box" hx-swap="outerHTML" hx-vals='{{ dict(vals, q=q, fstatus=status) | tojson }}'
 {%- endmacro %}
@@ -21,12 +21,14 @@ hx-post="/crawls/{{ crawl.id }}/journal/{{ e.id }}" hx-target="#journal-box" hx-
         <div class="jn-meta">
           {% if e.url %}{% set us = e.url.split('\n') %}
             {% if us|length == 1 %}<a href="#" class="jn-tag" data-click="journalGoUrl" data-args='{{ [us[0]] | tojson }}' title="{{ us[0] }}">{{ us[0] | replace('https://', '') | replace('http://', '') | truncate(40, true, '…') }}</a>
-            {% else %}<details class="jn-many"><summary class="jn-tag">{{ us|length }} URLs</summary>
+            {% else %}<details class="jn-many"><summary class="jn-tag jn-tag-many">{{ us|length }} URLs</summary>
               {% for u in us %}<a href="#" class="jn-go" data-click="journalGoUrl" data-args='{{ [u] | tojson }}'>{{ u }}</a>{% endfor %}</details>{% endif %}
           {% endif %}
           <span class="muted jn-date" title="{{ e.created_at[:16] | replace('T', ' ') }}">{{ e.created_at[8:10] }}/{{ e.created_at[5:7] }}/{{ e.created_at[:4] }}</span>
-          <button type="button" class="jn-icon" data-click="journalEdit" data-args='["$this"]' title="Editar" aria-label="Editar la nota">Editar</button>
-          <button type="button" class="jn-icon jn-del" {{ post(e, {'action': 'delete'}) }} hx-confirm="¿Borrar esta nota?" title="Borrar" aria-label="Borrar la nota">Borrar</button>
+          <span class="jn-acts">
+          <button type="button" class="jn-icon" data-click="journalEdit" data-args='["$this"]' title="Editar" aria-label="Editar la nota"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M11.3 1.7a1.5 1.5 0 0 1 2.1 0l.9.9a1.5 1.5 0 0 1 0 2.1L5.6 13.4 2 14l.6-3.6z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></button>
+          <button type="button" class="jn-icon jn-del" {{ post(e, {'action': 'delete'}) }} hx-confirm="¿Borrar esta nota?" title="Borrar" aria-label="Borrar la nota"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.8 6.5v5M9.2 6.5v5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+          </span>
         </div>
         <form class="jn-editform" hidden hx-post="/crawls/{{ crawl.id }}/journal/{{ e.id }}" hx-target="#journal-box" hx-swap="outerHTML">
           <input type="hidden" name="action" value="edit"><input type="hidden" name="q" value="{{ q }}"><input type="hidden" name="fstatus" value="{{ status }}">
@@ -37,7 +39,7 @@ hx-post="/crawls/{{ crawl.id }}/journal/{{ e.id }}" hx-target="#journal-box" hx-
       </div>
     </li>
   {% else %}
-    <li class="jn-empty muted">{% if q %}Ninguna nota coincide.{% else %}Aún no hay notas.<br>Marca una o varias URLs en la tabla y pulsa <b>Apuntar</b>.{% endif %}</li>
+    <li class="jn-empty muted">{% if q %}Ninguna nota coincide.{% else %}Aún no hay notas.<br>Marca una o varias URLs en la tabla y pulsa <b>Anotar</b>.{% endif %}</li>
   {% endfor %}
   </ul>
 

@@ -1,7 +1,7 @@
 {% macro kvval(label, v) %}{% if label in ('URL', 'Redirige a', 'Canonical', 'Canonical renderizado') and (v ~ '').startswith(('http://', 'https://')) %}<a href="{{ v }}" target="_blank" rel="noopener noreferrer" title="Abrir en una pestaña nueva">{{ v }}</a>{% else %}{{ v }}{% endif %}{% endmacro %}
 <nav class="tabbar">
   <a href="#" class="jn-apuntar" data-click="journalForUrl" data-args='{{ [url] | tojson }}'
-     title="Escribir una nota sobre esta URL">Apuntar</a>
+     title="Escribir una nota sobre esta URL">Anotar</a>
   {% for key, label in subtabs %}
     <a class="{{ 'on' if key == sub }}" hx-get="/crawls/{{ crawl.id }}/detail?src={{ src }}&sub={{ key }}&url={{ quote(url, safe='') }}"
        hx-target="#detail" hx-swap="innerHTML">{{ label }}{% if key == 'inlinks' and inlinks is defined %} ({{ inlinks|length }}){% elif key == 'outlinks' %} ({{ outlinks|length }}){% elif key == 'issues' %} ({{ issues|length }}){% elif key == 'images' and images is defined %} ({{ images|length }}){% endif %}</a>
@@ -132,8 +132,14 @@
     {% if not ai_status.enabled %}<div class="alert info">{{ ai_status.reason }} <button type="button" class="mini" data-click="openAiSetup">Configurar la IA…</button></div>
     {% else %}
       <p class="muted">{{ ai_status.provider }} · {{ ai_status.model }} — {{ ai_status.note }}</p>
-      <div class="row">{% for key, t in ai_tasks.items() if key != 'custom' %}
-        <button class="secondary mini" hx-post="/crawls/{{ crawl.id }}/ai?url={{ quote(url, safe='') }}&task={{ key }}" hx-target="#ai-out" hx-swap="innerHTML" hx-indicator="#ai-ind">{{ t[0] }}</button>
+      <div id="ai-client-wrap" hx-get="/clients/pick?crawl={{ crawl.id }}" hx-trigger="clientsChanged from:body" hx-swap="innerHTML">{% with pick_id = 'ai-client' %}{% include "_client_pick.html" %}{% endwith %}</div>
+      <div class="ai-lead">
+        <button class="mini" hx-post="/crawls/{{ crawl.id }}/ai?url={{ quote(url, safe='') }}&task=seo_pack" hx-include="#ai-client" hx-target="#ai-out" hx-swap="innerHTML" hx-indicator="#ai-ind">{{ ai_tasks.seo_pack[0] }}</button>
+        <span class="muted">Lee el contenido de la página y te propone los tres, listos para copiar.</span>
+        <a class="ai-all" href="/crawls/{{ crawl.id }}?ai=seo_pack" data-click="bulkFromDetail" data-args='["seo_pack"]'>Hacerlo con todas las páginas →</a>
+      </div>
+      <div class="row">{% for key, t in ai_tasks.items() if key not in ('custom', 'seo_pack') %}
+        <button class="secondary mini" hx-post="/crawls/{{ crawl.id }}/ai?url={{ quote(url, safe='') }}&task={{ key }}" hx-include="#ai-client" hx-target="#ai-out" hx-swap="innerHTML" hx-indicator="#ai-ind">{{ t[0] }}</button>
       {% endfor %}<span id="ai-ind" class="htmx-indicator"><span class="spinner"></span> Pensando…</span></div>
     {% endif %}
     <div id="ai-out">{% with results = ai_results, tasks = ai_tasks, error = None %}{% include "_ai_results.html" %}{% endwith %}</div>

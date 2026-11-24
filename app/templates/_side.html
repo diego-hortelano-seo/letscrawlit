@@ -42,7 +42,7 @@
       <tbody>
       {% for i in issue_rows %}
         <tr hx-get="/crawls/{{ crawl.id }}/grid?tab=issues&f={{ i.code }}" hx-target="#grid" hx-swap="outerHTML" title="{{ i.title }}">
-          <td>{{ i.title }}{{ qhelp({'why': i.why, 'fix': i.fix}) }}{% if jn and jn.issue[i.code] %} <span class="jn-mark" title="Apuntes sobre este problema">Notas: {{ jn.issue[i.code] }}</span>{% endif %}</td><td><span class="badge sev-{{ i.severity }}">{{ i.type }}</span></td><td>{{ i.priority }}</td>
+          <td>{{ i.title }}{{ qhelp({'why': i.why, 'fix': i.fix}) }}{% if jn and jn.issue[i.code] %} <span class="jn-mark" title="Notas sobre este problema">Notas: {{ jn.issue[i.code] }}</span>{% endif %}</td><td><span class="badge sev-{{ i.severity }}">{{ i.type }}</span></td><td>{{ i.priority }}</td>
           <td class="n">{{ i.count }}</td><td class="n">{{ i.pct }}%</td></tr>
       {% endfor %}
       </tbody>

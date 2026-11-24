@@ -73,7 +73,7 @@ DEFAULTS = {
     "block_hosts": "",
     "js_click": False,
     "js_click_max": 20,
-    "local_enabled": True,
+    "local_enabled": False,  # opt-in: most audited sites are not local businesses
     "local_name": "",
     "local_city": "",
     "local_phone": "",

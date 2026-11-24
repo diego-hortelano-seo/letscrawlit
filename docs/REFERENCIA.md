@@ -182,8 +182,10 @@ enlaces externos rotos (si se activa la comprobación) y, opcionalmente, rendimi
 
 ### SEO local
 
-Pestaña «SEO local» y configuración › SEO local (nombre, ciudad o ciudades, teléfono principal; todo opcional, si no se
-indica se deduce del schema y del teléfono más repetido). Comprueba:
+**Solo se hace si lo pides** (desde la 1.1.0): marca «Hacer la auditoría de SEO local» en Configuración › SEO local, o
+rellena el nombre, la ciudad o el teléfono del negocio. Si no, no aparecen la pestaña «SEO local» ni sus problemas
+(en una web que no es un negocio local solo serían ruido). Los datos son opcionales: si no se indican, se deducen del
+schema y del teléfono más repetido. Comprueba:
 
 - ficha LocalBusiness (o subtipo: Locksmith, GeneralContractor…) en la portada y sus datos (dirección, horario, geo, areaServed…);
 - que nombre, dirección y teléfono coincidan en todo el schema y con lo configurado, y que el teléfono del schema se vea en la web;
@@ -216,11 +218,13 @@ Menú **Apariencia**, a la derecha de la barra de menús: modo oscuro (el predet
 Atardecer, Grafito, Cereza) o tres colores a tu gusto (principal, acento y detalle). El resto de tonos se calcula a
 partir de ellos y el texto se pone en blanco o negro según el contraste. Se guarda solo en tu navegador.
 
-### Notas por URL
+### Notas
 
-Clic derecho en cualquier fila › «Añadir o editar nota» (o desde el panel inferior). Cada nota tiene un estado
-(pendiente, en curso, revisado, corregido) y se guarda **por sitio**, así que sigue ahí en los siguientes rastreos de
-la misma web. La pestaña «Notas» las reúne con filtros por estado; también salen en Internos y en `pages.csv`.
+Marca una o varias URLs en la tabla («Seleccionar varias», Ctrl+clic o Mayús+clic) y pulsa **Anotar** (también en el
+clic derecho, «Anotar sobre esta URL», y en el panel inferior). La ventana muestra los problemas que comparten esas
+URLs, con su gravedad y cuántas los tienen (3/3), y unas frases rápidas: un clic añade la línea a la nota y otro la
+quita. El botón **Notas** abre todas las de la auditoría como tarjetas, con buscador; se pueden editar y borrar, y
+pasan al informe con «Exportar resumen» › «Incluir mis notas».
 
 ### Opciones avanzadas de rastreo
 
@@ -246,9 +250,9 @@ No incluye a propósito: ignorar robots.txt ni conectores de bases de backlinks 
 
 ### IA y datos de Google
 
-- IA: Configuración › «Inteligencia artificial (IA)…» (o directamente desde «IA en bloque»). Eliges Claude,
-  OpenAI, Gemini u Ollama, pegas la clave y se activa al momento, sin reiniciar. Se guarda en tu `.env` local
-  (`AI_PROVIDER`, `AI_MODEL` y `ANTHROPIC_API_KEY`, `OPENAI_API_KEY` o `GEMINI_API_KEY`), que nunca se sube a git;
+- IA: menú **IA** › «Configurar la IA…» (o Configuración › «Inteligencia artificial (IA)…»). Eliges Claude,
+  OpenAI, Gemini, Groq u Ollama, pegas la clave y se activa al momento, sin reiniciar. Se guarda en tu `.env` local
+  (`AI_PROVIDER`, `AI_MODEL` y `ANTHROPIC_API_KEY`, `OPENAI_API_KEY`, `GEMINI_API_KEY` o `GROQ_API_KEY`), que nunca se sube a git;
   la clave no vuelve a mostrarse en pantalla. Solo se puede cambiar desde el propio equipo. También puedes editar
   `.env` a mano como antes.
 - Search Console y Analytics 4 sin CSV: crea un cliente OAuth «App de escritorio» en Google Cloud, activa las APIs de
@@ -270,12 +274,41 @@ medio de imágenes, peso del HTML, páginas con poco contenido, sin título o si
 tarjetas de todas las métricas, exportación a CSV (una fila por auditoría, lista para Looker Studio, Sheets o Excel)
 y un formulario para crear la tarea programada de Windows que rastrea el sitio cada día, semana o mes.
 
+### Title, meta description y datos estructurados con IA
+
+Menú **IA** › «Escribir title, meta description y datos estructurados». La IA lee el contenido de cada página y propone:
+
+- un title de 50-60 caracteres y una meta description de 140-155, en el idioma de la página;
+- datos estructurados JSON-LD del tipo que encaja (Article, Product, Service, SoftwareApplication, FAQPage…), sin
+  inventar precios, valoraciones, teléfonos ni direcciones, y teniendo en cuenta los tipos que la página ya declara.
+
+En el panel de IA de una URL salen en una tarjeta con la longitud de cada texto (en verde si está en el rango
+recomendado), el bloque `<script type="application/ld+json">` listo para pegar y un botón «Copiar» en cada uno.
+En la pestaña «IA» salen como columnas al lado del title y la description actuales, y se exportan con la vista.
+Revísalos siempre y valida el JSON-LD en la Prueba de resultados enriquecidos de Google.
+
+### Fichas de cliente
+
+Menú **IA** › «Clientes y su contexto…»: nombre, sector, público objetivo, tono y estilo de escritura, términos a
+evitar y contexto del negocio. Al elegir el cliente («Escribir para», en «IA en bloque» y en el panel de IA de cada
+URL), la IA lee su ficha antes de escribir, respeta el tono y nunca usa los términos vetados. El último cliente usado
+en una web queda elegido para esa web. Se guardan en `data/clients.json` y valen para cualquier auditoría.
+
 ### IA en bloque
 
-En cualquier pestaña de páginas, «IA en bloque» aplica una tarea a todas las filas de la vista actual (pestaña,
-filtro y búsqueda; hasta 500): clasificar la intención de búsqueda, reescribir la meta description, palabra clave y
-grupo temático, resumen, traducción o **tu propia instrucción**. Los resultados se guardan como columnas en la pestaña
-«IA» (con filtros por intención) y salen en las exportaciones. Si fallan 3 páginas seguidas (clave, saldo…), se detiene.
+Aplica una tarea a muchas páginas a la vez (hasta 500): title, meta description y datos estructurados, clasificar la
+intención de búsqueda, reescribir la meta description, palabra clave y grupo temático, resumen, traducción o **tu
+propia instrucción**. Se abre desde el menú **IA**, el botón «IA en bloque» de la tabla o la cabecera de la pestaña «IA».
+
+- **¿En qué URLs?** Solo las que hayas seleccionado en la tabla, o todas las de la vista actual (pestaña, filtro y
+  búsqueda).
+- **¿Para qué cliente?** La ficha de cliente que la IA debe seguir, o ninguna.
+
+Los resultados se guardan como columnas en la pestaña «IA» (solo se muestran las que tienen datos, con filtros por
+intención; un clic en una fila abre la propuesta completa) y salen en las exportaciones. Va de tres en tres páginas
+tras la primera respuesta correcta (Ollama, de una en una). Si el proveedor pide ir más despacio (límite de los planes
+gratuitos, como el de Groq), baja a una página cada vez, espera y sigue solo. Si fallan 3 páginas seguidas por otro
+motivo (clave, saldo…), se detiene.
 
 Las tareas se eligen con tarjetas que explican qué hace cada una y muestran un ejemplo de respuesta, aunque la IA aún
 no esté activada. Tus propias instrucciones se pueden **guardar con un nombre** y quedan disponibles en todas las
@@ -474,7 +507,7 @@ Para guardar o mover una auditoría completa (y poder reanudarla), usa «Exporta
 | `LETSCRAWL_ALLOWED_HOSTS` | (vacío) | Nombres extra con los que se puede abrir la app (p. ej. `mi-portatil.local`); por defecto solo `localhost` y direcciones IP |
 | `LETSCRAWL_OPEN_BROWSER` | `1` | Abrir el navegador al arrancar |
 | `LETSCRAWL_DATA_DIR` | `data` | Carpeta de datos |
-| `LETSCRAWL_USER_AGENT` | `LetsCrawlit/1.0.0` | User-Agent (también para robots.txt) |
+| `LETSCRAWL_USER_AGENT` | `LetsCrawlit/1.1.0` | User-Agent (también para robots.txt) |
 | `LETSCRAWL_DEFAULT_MAX_URLS` / `LETSCRAWL_MAX_URLS_LIMIT` | `0` / `0` | Tope por defecto y tope de seguridad (0 = sin límite) |
 | `LETSCRAWL_DEFAULT_DELAY` / `LETSCRAWL_MIN_DELAY` | `1.0` / `0.2` | Pausa por defecto y mínima (s) |
 | `LETSCRAWL_RENDER_TIMEOUT` | `20` | Tiempo máximo de renderizado por página (s) |

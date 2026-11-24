@@ -56,6 +56,7 @@ PATTERNS: list[tuple[re.Pattern, callable]] = [(re.compile(rx), fn) for rx, fn i
     (r"^¿Borrar la instrucción guardada «(.+)»\?$", lambda m: f"Delete the saved instruction «{m[1]}»?"),
     (r"^Borrar «(.+)»$", lambda m: f"Delete «{m[1]}»"),
     (r"^(\d+) fila\(s\)$", lambda m: f"{m[1]} row(s)"),
+    (r"^(\d+) caracteres$", lambda m: f"{m[1]} characters"),
     (r"^(\d+) URL\(s\)$", lambda m: f"{m[1]} URL(s)"),
     (r"^(\d+) URL\(s\) afectada\(s\)$", lambda m: f"{m[1]} affected URL(s)"),
     (r"^(\d+) avisos?$", lambda m: f"{m[1]} warning(s)"),
@@ -153,6 +154,15 @@ PHRASES: list[tuple[re.Pattern, str]] = [(re.compile(rx), en) for rx, en in [
 
 # Texts with numbers or names inside that were still in Spanish ({1} = as it is, {t1} = translated).
 EXTRA_PATTERNS_EN = [
+    ("^La IA está trabajando: (\\d+) de (\\d+) páginas$", "The AI is working: {1} of {2} pages"),
+    ("^(\\d+) de (\\d+) páginas con propuestas de la IA$", "{1} of {2} pages with AI proposals"),
+    ("^Guardado: (.+)\\.$", "Saved: {1}."),
+    ("^Ya hay un cliente llamado «(.+)»\\.$", "There is already a client called «{1}»."),
+    ("^Como mucho (\\d+) clientes: borra alguno antes\\.$", "At most {1} clients: delete one first."),
+    ("^Solo las (\\d+) URLs que has seleccionado$", "Only the {1} URLs you selected"),
+    ("^Todas las páginas de la vista actual \\((\\d+|…)\\)$", "Every page in the current view ({1})"),
+    ("^Las de la pestaña, el filtro y la búsqueda que tienes puestos, como mucho (\\d+)\\.$", "Those in your current tab, filter and search, at most {1}."),
+    ("^Una petición por página a (.+?)( \\(.+?\\))?(: el texto de cada página sale de tu equipo y tiene coste según tu plan)?\\.$", "One request per page to {1}{2}{3?: each page's text leaves your computer and costs according to your plan}."),
     ('^(Comprobando enlaces externos|Comprobando recursos internos|Repitiendo tiempos lentos|PageSpeed Insights) (\\d+) / (\\d+)$', "{t1} {2} / {3}"),
     ('^Detenido por ti · se analizaron (\\d+) URL\\(s\\)$', "Stopped by you · {1} URL(s) analysed"),
     ('^Conectado el (.+) UTC\\.$', "Connected on {1} UTC."),

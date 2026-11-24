@@ -7,12 +7,24 @@ document.body.addEventListener('aiChanged', function () {
 document.getElementById('ai-setup-dlg').addEventListener('close', function () {
   if (document.getElementById('ai-dlg').open) openBulk();
 });
-function openBulk() {
+var BULK_TASK = '';
+function openBulk(task) {  // task: the card to show already chosen (menu «IA», the button in a URL's AI panel)
+  if (typeof task === 'string') BULK_TASK = task;
   var st = document.getElementById('grid-state'), qs = new URLSearchParams();
   if (st) st.querySelectorAll('input').forEach(function (i) { qs.set(i.name, i.value); });
-  document.getElementById('ai-dlg').showModal();
+  if (BULK_TASK) qs.set('task', BULK_TASK);
+  if (SEL_URLS.length) qs.set('nsel', SEL_URLS.length);  // offer «Solo las URLs que has seleccionado»
+  var d = document.getElementById('ai-dlg');
+  if (!d.open) d.showModal();
   htmx.ajax('GET', '/crawls/' + CRAWL_ID + '/ai/bulk?' + qs.toString(), {target: '#ai-bulk-slot', swap: 'innerHTML'});
 }
+(function () {  // /crawls/<id>?ai=seo_pack (from a URL's AI panel opened on its own page): open «IA en bloque» at once
+  var p = new URLSearchParams(location.search), t = p.get('ai');
+  if (!t) return;
+  p.delete('ai'); history.replaceState(null, '', location.pathname + (p.toString() ? '?' + p : ''));
+  document.addEventListener('DOMContentLoaded', function () { openBulk(t); });
+  if (document.readyState !== 'loading') openBulk(t);
+})();
 // --- notes per URL: right click on a row, or the link in the detail panel -------------------------
 var NOTE_ENDPOINT = '/crawls/' + CRAWL_ID + '/note';
 var ctxUrl = null;
@@ -123,6 +135,11 @@ document.addEventListener('keydown', function (e) {
   clearSelection();
 });
 document.addEventListener('htmx:afterSwap', paintSelection);
+// «IA en bloque» › «Solo las URLs que has seleccionado»: the form carries the rows ticked in the table
+document.addEventListener('htmx:afterSettle', function () {
+  var h = document.getElementById('bulk-sel-urls');
+  if (h) h.value = SEL_URLS.join(String.fromCharCode(10));
+});
 // Tab chooser ("Configurar pestañas"): which tabs are visible is a per-browser preference.
 var TABS_KEY = 'letscrawl.hiddenTabs';
 function hiddenTabs() { try { return JSON.parse(localStorage.getItem(TABS_KEY) || '[]'); } catch (e) { return []; } }
@@ -172,11 +189,20 @@ function journalForUrl(url) {  // from the detail panel or the right-click menu:
   journalCompose([url]);
 }
 function journalForSelected() { journalCompose(SEL_URLS.slice()); }
-function apuntarAdd(text) {  // a chip: add its line to the note
+function copyBlock(btn) {  // AI proposals: copy the value next to the button (title, description or the JSON-LD <script>)
+  var v = btn.closest('.sp-field').querySelector('.sp-val'), text = v ? v.textContent.trim() : '';
+  var done = function () { var o = btn.textContent; btn.textContent = lcT('Copiado'); btn.classList.add('ok'); setTimeout(function () { btn.textContent = o; btn.classList.remove('ok'); }, 1400); };
+  if (navigator.clipboard && window.isSecureContext) navigator.clipboard.writeText(text).then(done);
+  else { var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select(); document.execCommand('copy'); ta.remove(); done(); }
+}
+function apuntarAdd(text) {  // a chip: add its line to the note; a second click takes it out again
   var t = document.getElementById('ap-text');
   if (!t) return;
-  var NL = String.fromCharCode(10), cur = t.value.replace(/\s+$/, '');
-  if (cur.indexOf(text) < 0) t.value = (cur ? cur + NL : '') + '• ' + text + NL;
+  var NL = String.fromCharCode(10), line = '• ' + text, cur = t.value.replace(/\s+$/, '');
+  var lines = cur ? cur.split(NL) : [], k = lines.indexOf(line), on = k < 0;
+  if (on) { if (cur.indexOf(text) < 0) lines.push(line); else on = true; } else lines.splice(k, 1);
+  t.value = lines.length ? lines.join(NL) + NL : '';
+  if (this && this.classList) { this.classList.toggle('on', on); this.setAttribute('aria-pressed', on ? 'true' : 'false'); }
   t.focus(); t.setSelectionRange(t.value.length, t.value.length);
 }
 // Saved: close the window, show the on the rows and the new count, without moving the table
@@ -191,6 +217,12 @@ document.addEventListener('htmx:afterRequest', function (e) {
     var b = document.createElement('span'); b.className = 'copied'; b.textContent = ' · ' + lcT('Nota guardada');
     s.appendChild(b); setTimeout(function () { b.remove(); }, 2000);
   });
+});
+// «IA en bloque» started (or stopped): the «IA» tab shows the progress and the new columns as they arrive
+document.addEventListener('htmx:afterRequest', function (e) {
+  var p = e.detail.pathInfo && e.detail.pathInfo.requestPath || '';
+  if (e.detail.successful && /\/ai\/bulk(\/cancel)?$/.test(p) && e.detail.requestConfig && e.detail.requestConfig.verb === 'post'
+      && document.querySelector('#grid .ai-banner')) refreshGrid();
 });
 function refreshGrid() {
   var g = document.getElementById('grid');

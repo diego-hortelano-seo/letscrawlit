@@ -27,7 +27,7 @@
     <button type="button" class="secondary mini" data-click="toggleJournal" aria-label="Cerrar las notas">Cerrar</button></div>
   <div id="journal-slot"><span class="spinner"></span></div>
 </aside>
-<dialog class="note-dlg ap-dlg" id="apuntar-dlg" aria-label="Apuntar"><div id="apuntar-slot"><span class="spinner"></span></div></dialog>
+<dialog class="note-dlg ap-dlg" id="apuntar-dlg" aria-label="Anotar"><div id="apuntar-slot"><span class="spinner"></span></div></dialog>
 <dialog class="note-dlg ap-dlg" id="download-dlg" aria-label="Descargar el resumen">
   <form method="get" id="download-form" action="/crawls/{{ crawl.id }}/client-report/pdf" data-submit="downloadGo">
     <input type="hidden" name="summary" value="1" id="dl-summary">
@@ -66,7 +66,7 @@
   {% include "_side.html" %}
 </div>
 <div class="ctx-menu" id="ctx" hidden role="menu">
-  <button type="button" role="menuitem" data-act="apuntar">Apuntar sobre esta URL</button>
+  <button type="button" role="menuitem" data-act="apuntar">Anotar sobre esta URL</button>
   <button type="button" role="menuitem" data-act="copy">Copiar URL</button>
   <button type="button" role="menuitem" data-act="open">Abrir URL en una pestaña nueva</button>
 </div>

@@ -516,7 +516,8 @@ def save_ai(crawl_id: int, url: str, task: str, result: str, model: str) -> None
 
 def ai_version(crawl_id: int) -> tuple:
     with connect() as c:
-        return tuple(c.execute("SELECT COUNT(*), MAX(created_at) FROM ai_results WHERE crawl_id=?", (crawl_id,)).fetchone())
+        # MAX(rowid): INSERT OR REPLACE gives the row a new rowid, so a page redone within the same second still counts
+        return tuple(c.execute("SELECT COUNT(*), MAX(created_at), MAX(rowid) FROM ai_results WHERE crawl_id=?", (crawl_id,)).fetchone())
 
 
 def load_ai(crawl_id: int, url: str | None = None) -> list[dict]:

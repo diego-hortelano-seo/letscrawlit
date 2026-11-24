@@ -1,0 +1,9 @@
+{# Which client the AI writes for. Needs `clients`, `client` (the chosen one or none) and `pick_id`. #}
+<div class="cl-pick">
+  <label for="{{ pick_id }}">Escribir para</label>
+  <select id="{{ pick_id }}" name="client">
+    <option value="none" {% if not client %}selected{% endif %}>Sin ficha de cliente</option>
+    {% for c in clients %}<option value="{{ c.id }}" {% if client and client.id == c.id %}selected{% endif %}>{{ c.name }}</option>{% endfor %}
+  </select>
+  <button type="button" class="secondary mini" data-click="openClients" data-args='["{{ 'list' if clients else 'new' }}"]'>{{ 'Clientes…' if clients else 'Crear una ficha de cliente' }}</button>
+</div>

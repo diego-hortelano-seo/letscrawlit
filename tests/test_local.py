@@ -33,6 +33,9 @@ def page(path, title, h1, body, head=""):
     return {"url": BASE + path, "status_code": 200, "content_type": "text/html", **d}
 
 
+ON = {"local_enabled": True}
+
+
 def test_audit_finds_local_problems():
     pages = [
         page("/", "Cerrajero en Gijón 24 h", "Cerrajeros en Gijon", "<a href='tel:985123456'>Llamar</a>", SCHEMA),
@@ -42,7 +45,7 @@ def test_audit_finds_local_problems():
         page("/aviso-legal", "Aviso legal", "Aviso legal", "<p>texto</p>"),
     ]
     links = [{"source_url": p["url"], "target_url": l["href"], "kind": "a", "internal": True} for p in pages for l in p["links"]]
-    res = audit(pages, links, BASE + "/", {})
+    res = audit(pages, links, BASE + "/", ON)
     codes = {(c, u.replace(BASE, "")) for c, u, _ in res["issues"]}
     # city comes from the schema (addressLocality) and matches without accents
     assert ("local_city_missing", "/apertura-de-puertas") in codes
@@ -65,9 +68,20 @@ def test_audit_finds_local_problems():
     assert codes2.count("local_nap_inconsistent") == 2 and "local_city_missing" in codes2
 
     # analyze() includes them with severity, explanation and remediation
-    issues = analyze(pages, links, start_url=BASE + "/", local={})
+    issues = analyze(pages, links, start_url=BASE + "/", local=ON)
     i = next(i for i in issues if i.code == "local_phone_not_clickable")
     assert i.severity == "medium" and "tel:" in i.remediation
+
+
+def test_local_audit_runs_only_when_asked():
+    pages = [page("/", "Cerrajero en Gijón 24 h", "Cerrajeros en Gijon", "<a href='tel:985123456'>Llamar</a>", SCHEMA),
+             page("/contacto", "Contacto", "Contacto", "<p>Escríbenos</p>")]
+    assert audit(pages, [], BASE + "/", {})["issues"] == []  # not ticked, nothing filled in: no local SEO
+    assert not any(i.code.startswith("local_") for i in analyze(pages, [], start_url=BASE + "/", local={}))
+    assert audit(pages, [], BASE + "/", {"local_city": "Gijón"})["issues"]  # filling in the details is asking for it
+    from app.views import tabs_for
+    assert "local" not in [t.key for t in tabs_for({"settings": {}})]
+    assert "local" in [t.key for t in tabs_for({"settings": ON})]
 
 
 def test_audit_without_local_data_is_silent():

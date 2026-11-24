@@ -10,6 +10,7 @@ Nothing is sent anywhere unless you configure a provider and press a button for 
 """
 from __future__ import annotations
 
+import json
 import os
 import time
 
@@ -46,9 +47,23 @@ TASKS = {
     "topic": ("Palabra clave y grupo temático",
               "Indica la palabra clave principal de esta página y el grupo temático (clúster) al que pertenece. "
               "Responde en una sola línea con el formato: palabra clave | grupo temático"),
+    "seo_pack": ("Escribir title, meta description y datos estructurados",
+                 "A partir del contenido de esta página, escribe:\n"
+                 "1. Un <title> SEO de 50-60 caracteres con la palabra clave principal al principio.\n"
+                 "2. Una meta description de 140-155 caracteres, con la palabra clave y una llamada a la acción.\n"
+                 "3. Datos estructurados JSON-LD de schema.org con el tipo que mejor describa la página (Article, BlogPosting, "
+                 "Product, Service, SoftwareApplication, FAQPage, Organization, LocalBusiness solo si es un negocio con dirección "
+                 "física visible, WebPage…). Usa la URL de la página como url/@id. Incluye solo propiedades cuyo valor aparezca "
+                 "en el contenido: nunca inventes precios, valoraciones, teléfonos, direcciones, fechas ni autores.\n"
+                 "Escribe el título y la descripción en el idioma del contenido.\n"
+                 "Responde SOLO con un objeto JSON válido, sin texto antes ni después y sin ```, con esta forma exacta:\n"
+                 '{"title": "...", "description": "...", "schema_type": "...", "jsonld": {"@context": "https://schema.org", ...}, '
+                 '"notes": "una frase con lo que conviene revisar o completar a mano"}'),
     "custom": ("Mi propia instrucción", ""),
 }
-BULK_TASKS = ("intent", "meta_rewrite", "topic", "custom", "summary", "translate_en")
+BULK_TASKS = ("intent", "meta_rewrite", "topic", "custom", "summary", "translate_en", "seo_pack")
+SEO_PACK_TITLE = (30, 60)          # recommended lengths shown next to the proposals
+SEO_PACK_DESCRIPTION = (120, 158)
 MAX_CUSTOM_PROMPT = 2000
 SYSTEM = ("Eres un consultor SEO que trabaja para el propietario del sitio. Usa solo la información de la página; "
           "no inventes datos (precios, teléfonos, direcciones) que no aparezcan. Sé conciso.")
@@ -56,6 +71,10 @@ SYSTEM = ("Eres un consultor SEO que trabaja para el propietario del sitio. Usa 
 
 class AIUnavailable(RuntimeError):
     pass
+
+
+class RateLimited(AIUnavailable):
+    """The provider asks to slow down (HTTP 429, typical of free plans): wait and retry, it is not a real failure."""
 
 
 def status() -> dict:
@@ -88,15 +107,76 @@ def status() -> dict:
     return {"enabled": False, "reason": "La IA aún no está activada: elige un proveedor y pega tu clave en Configuración › Inteligencia artificial (IA)."}
 
 
-def _page_context(page: dict) -> str:
+def _page_context(page: dict, task: str = "") -> str:
     text = (page.get("rendered_text") or page.get("text_excerpt") or "")[:12000]
+    extra = ""
+    if task == "seo_pack":  # what the page already declares, so the proposal completes it instead of repeating it
+        st = page.get("structured") or {}
+        if isinstance(st, str):
+            try:
+                st = json.loads(st)
+            except ValueError:
+                st = {}
+        types = ", ".join(st.get("jsonld_types") or []) if isinstance(st, dict) else ""
+        h2 = " | ".join((page.get("h2") or [])[:12]) if isinstance(page.get("h2"), list) else ""
+        extra = (f"Idioma declarado: {page.get('lang') or '(ninguno)'}\nH2: {h2 or '(ninguno)'}\n"
+                 f"Tipos de schema.org que ya tiene: {types or '(ninguno)'}\n")
     return (f"URL: {page.get('url')}\nTítulo actual: {page.get('title') or '(ninguno)'}\n"
             f"Meta descripción actual: {page.get('meta_description') or '(ninguna)'}\n"
-            f"H1: {' | '.join(page.get('h1') or []) or '(ninguno)'}\n\nContenido visible:\n{text}")
+            f"H1: {' | '.join(page.get('h1') or []) or '(ninguno)'}\n{extra}\nContenido visible:\n{text}")
 
 
-def run_task(task: str, page: dict, custom_prompt: str = "") -> tuple[str, str]:
-    """Returns (result_text, model). Raises AIUnavailable with a user-facing message on any failure."""
+def _salvage_seo_pack(raw: str) -> dict | None:
+    """Small models sometimes stop before closing the JSON: keep the title and description that did arrive."""
+    import re
+    out = {}
+    for key in ("title", "description", "schema_type"):
+        m = re.search(r'"%s"\s*:\s*"((?:[^"\\]|\\.)*)"' % key, raw)
+        if m:
+            try:
+                out[key] = json.loads(f'"{m[1]}"')
+            except ValueError:
+                out[key] = m[1]
+    return out if out.get("title") or out.get("description") else None
+
+
+def parse_seo_pack(text: str) -> dict | None:
+    """The «seo_pack» answer -> {title, description, schema_type, jsonld (pretty string), notes, *_len, *_ok}.
+    Models sometimes wrap the JSON in ``` or add a sentence around it: take the outermost {...}. None if unreadable."""
+    raw = (text or "").strip()
+    start, end = raw.find("{"), raw.rfind("}")
+    data = None
+    if start >= 0 and end > start:
+        try:
+            data = json.loads(raw[start:end + 1])
+        except ValueError:
+            data = None
+    if not isinstance(data, dict):
+        data = _salvage_seo_pack(raw[start:] if start >= 0 else raw)  # an answer cut off half-way through the JSON-LD
+        if not data:
+            return None
+    title = " ".join(str(data.get("title") or "").split())
+    desc = " ".join(str(data.get("description") or "").split())
+    ld = data.get("jsonld")
+    if isinstance(ld, str):
+        try:
+            ld = json.loads(ld)
+        except ValueError:
+            ld = None
+    jsonld = json.dumps(ld, ensure_ascii=False, indent=2) if isinstance(ld, (dict, list)) and ld else ""
+    stype = str(data.get("schema_type") or (ld.get("@type") if isinstance(ld, dict) else "") or "")
+    notes = " ".join(str(data.get("notes") or "").split())
+    if not jsonld and data.get("jsonld") is None and "jsonld" not in data and stype:
+        notes = (notes + " " if notes else "") + "La respuesta llegó cortada y faltan los datos estructurados: vuelve a generarla."
+    return {"title": title, "description": desc, "schema_type": stype, "jsonld": jsonld,
+            "notes": notes,
+            "title_len": len(title), "title_ok": SEO_PACK_TITLE[0] <= len(title) <= SEO_PACK_TITLE[1],
+            "description_len": len(desc), "description_ok": SEO_PACK_DESCRIPTION[0] <= len(desc) <= SEO_PACK_DESCRIPTION[1]}
+
+
+def run_task(task: str, page: dict, custom_prompt: str = "", client: dict | None = None) -> tuple[str, str]:
+    """Returns (result_text, model). Raises AIUnavailable with a user-facing message on any failure.
+    `client`: a profile from clients.py; its tone, audience and context go before the page."""
     if task not in TASKS:
         raise AIUnavailable("Tarea desconocida.")
     instruction = TASKS[task][1]
@@ -108,7 +188,9 @@ def run_task(task: str, page: dict, custom_prompt: str = "") -> tuple[str, str]:
     st = status()
     if not st["enabled"]:
         raise AIUnavailable(st["reason"])
-    prompt = instruction + "\n\n" + _page_context(page)
+    from .clients import prompt_block
+    brief = prompt_block(client)
+    prompt = instruction + "\n\n" + (brief + "\n\n" if brief else "") + _page_context(page, task)
     if st["provider"] == "anthropic":
         return _claude(prompt, st["model"]), st["model"]
     if st["provider"] == "openai":
@@ -180,16 +262,27 @@ def _http_error(name: str, r: httpx.Response, model: str) -> AIUnavailable:
     if r.status_code in (500, 502, 503, 504):
         return AIUnavailable(f"{name} está saturado o caído ahora mismo (no es un fallo tuyo); prueba de nuevo en un minuto.")
     if r.status_code == 429:
-        return AIUnavailable(f"Límite de uso de {name} alcanzado; prueba en un minuto.")
+        return RateLimited(f"Límite de uso de {name} alcanzado; prueba en un minuto.")
     return AIUnavailable(f"{name} devolvió HTTP {r.status_code}.")
 
 
-def _chat_completions(base: str, key_var: str, name: str, model: str, system: str, msgs: list[dict]) -> httpx.Response:
-    try:
-        return httpx.post(base + "/chat/completions", timeout=120, headers={"Authorization": f"Bearer {os.getenv(key_var, '')}"},
-                          json={"model": model, "messages": [{"role": "system", "content": system}, *msgs]})
-    except httpx.HTTPError:
-        raise AIUnavailable(f"No hay conexión con la API de {name}.")
+def _chat_completions(base: str, key_var: str, name: str, model: str, system: str, msgs: list[dict],
+                      extra: dict | None = None) -> httpx.Response:
+    body = {"model": model, "messages": [{"role": "system", "content": system}, *msgs], **(extra or {})}
+    for attempt in range(3):  # «too many requests» (free plans, several pages at once): wait what it asks and retry
+        try:
+            r = httpx.post(base + "/chat/completions", timeout=120, headers={"Authorization": f"Bearer {os.getenv(key_var, '')}"},
+                           json=body)
+        except httpx.HTTPError:
+            raise AIUnavailable(f"No hay conexión con la API de {name}.")
+        if r.status_code != 429 or attempt == 2:
+            return r
+        try:
+            wait = float(r.headers.get("retry-after") or 0)
+        except ValueError:
+            wait = 0
+        time.sleep(min(20.0, wait or 4.0 * (attempt + 1)))
+    return r
 
 
 def _completion_text(r: httpx.Response, name: str) -> str:
@@ -227,13 +320,19 @@ def _groq_replacement(current: str) -> str | None:
     return next((i for i in chat if any(x in i.lower() for x in ("gpt-oss", "llama", "qwen", "kimi"))), None)
 
 
+def _groq_extra(model: str) -> dict:
+    """gpt-oss models «think» before answering; for SEO texts little thinking is enough, and it spends about a quarter
+    fewer tokens of the free plan's per-minute allowance (measured: 1.9k instead of 2.5k per page)."""
+    return {"reasoning_effort": "low"} if "gpt-oss" in model else {}
+
+
 def _groq(prompt: str, model: str, system: str = SYSTEM, messages: list[dict] | None = None) -> str:
     msgs = messages or [{"role": "user", "content": prompt}]
-    r = _chat_completions(GROQ_BASE, "GROQ_API_KEY", "Groq", model, system, msgs)
+    r = _chat_completions(GROQ_BASE, "GROQ_API_KEY", "Groq", model, system, msgs, _groq_extra(model))
     if r.status_code in (400, 404) and "model" in r.text.lower():   # retired or unknown model
         alt = _groq_replacement(model)
         if alt:
-            r = _chat_completions(GROQ_BASE, "GROQ_API_KEY", "Groq", alt, system, msgs)
+            r = _chat_completions(GROQ_BASE, "GROQ_API_KEY", "Groq", alt, system, msgs, _groq_extra(alt))
     if r.status_code != 200:
         raise _http_error("Groq", r, model)
     return _completion_text(r, "Groq")

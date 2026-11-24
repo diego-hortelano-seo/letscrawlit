@@ -26,6 +26,31 @@
     <div class="filterbar"><button type="button" class="secondary mini jn-btn" id="jn-btn" data-total="{{ jn.total if jn else 0 }}" data-click="toggleJournal" title="Todas tus notas de URLs de esta web">Notas{% if jn and jn.total %} ({{ jn.total }}){% endif %}</button></div>
     {% include "_issues.html" %}
   {% else %}
+  {% if tab.key == 'ai' and ai_tab %}{% set at = ai_tab %}
+  <div class="ai-banner{{ ' empty' if not at.done }}" {% if at.job and at.job.running %}hx-get="{{ gurl() }}" hx-trigger="every 3s" hx-target="#grid" hx-swap="outerHTML"{% endif %}>
+    <div class="ai-banner-text">
+      {% if at.job and at.job.running %}
+        <b><span class="spinner"></span> La IA está trabajando: {{ at.job.done }} de {{ at.job.total }} páginas</b>
+        <span class="muted">{{ at.job.note or 'Los resultados van apareciendo en esta tabla.' }}</span>
+      {% elif at.done %}
+        <b>{{ at.done }} de {{ at.total }} páginas con propuestas de la IA</b>
+        <span class="muted">Haz clic en una fila para ver la propuesta completa y copiarla. Exporta la vista para pasársela al cliente o al desarrollador.</span>
+      {% else %}
+        <b>La IA escribe por ti el title, la meta description y los datos estructurados de cada página</b>
+        <span class="muted">Elige en qué páginas y para qué cliente, y las propuestas aparecen aquí, al lado de lo que hay ahora, listas para revisar y exportar.</span>
+      {% endif %}
+    </div>
+    <div class="ai-banner-actions">
+      {% if not at.enabled %}
+        <button type="button" class="mini" data-click="openAiSetup">Configurar la IA…</button>
+      {% elif not active and not (at.job and at.job.running) %}
+        <button type="button" class="mini" data-click="openBulk" data-args='["seo_pack"]'>Escribir title, meta description y datos estructurados</button>
+        <button type="button" class="secondary mini" data-click="openBulk">Otras tareas…</button>
+      {% endif %}
+      <button type="button" class="secondary mini" data-click="openClients" title="Tono, público y negocio de cada cliente">{{ at.client.name if at.client else 'Clientes…' }}</button>
+    </div>
+  </div>
+  {% endif %}
   <form class="filterbar" action="/crawls/{{ crawl.id }}/grid" hx-get="/crawls/{{ crawl.id }}/grid" hx-target="#grid" hx-swap="outerHTML"
         hx-trigger="change from:select, input changed delay:300ms from:input[type=search], submit">
     <input type="hidden" name="tab" value="{{ tab.key }}"><input type="hidden" name="sort" value="{{ sort }}"><input type="hidden" name="dir" value="{{ dir }}">
@@ -44,7 +69,7 @@
     <button type="button" class="secondary mini multi-btn" id="multi-btn" aria-pressed="false" data-click="toggleMulti"
       title="Activa para marcar varias URLs con un clic cada una. También: Ctrl+clic suma una fila y Mayús+clic un rango. Esc deselecciona">Seleccionar varias</button>
     <button type="button" class="mini" id="copy-sel-btn" hidden data-click="copySelected" title="Copiar las URLs seleccionadas, una por línea">Copiar URLs</button>
-    <button type="button" class="mini jn-url-btn" id="jn-url-btn" hidden data-click="journalForSelected" title="Escribir un apunte sobre la URL seleccionada">Apuntar</button>
+    <button type="button" class="mini jn-url-btn" id="jn-url-btn" hidden data-click="journalForSelected" title="Escribir una nota sobre las URLs seleccionadas">Anotar</button>
     <button type="button" class="secondary mini jn-btn" id="jn-btn" data-total="{{ jn.total if jn else 0 }}" data-click="toggleJournal" title="Todas tus notas de URLs de esta web">Notas{% if jn and jn.total %} ({{ jn.total }}){% endif %}</button>
     {% if tab.source == 'pages' and not active %}<button type="button" class="secondary mini" data-click="openBulk" title="Aplicar una tarea de IA a todas las filas de esta vista">IA en bloque</button>{% endif %}
     <span id="grid-state" hidden><input type="hidden" name="tab" value="{{ tab.key }}" form="none"><input type="hidden" name="f" value="{{ f }}" form="none"><input type="hidden" name="q" value="{{ q }}" form="none"></span>
@@ -55,7 +80,13 @@
       </div></details>
   </form>
   <div class="grid-scroll">
-    {% if rows %}
+    {% if tab.key == 'ai' and ai_tab and not ai_tab.done and not active %}
+      <ol class="ai-howto">
+        <li><b>Elige las páginas.</b> Todas las de la vista, o solo las que marques en cualquier pestaña con «Seleccionar varias».</li>
+        <li><b>Elige el cliente.</b> La IA lee su ficha (tono, público, términos a evitar) y escribe como él.</li>
+        <li><b>Revisa y exporta.</b> Cada propuesta sale aquí al lado de la actual; haz clic en una fila para copiarla.</li>
+      </ol>
+    {% elif rows %}
     <table class="dg">
       <thead><tr>
         <th class="n">#</th>

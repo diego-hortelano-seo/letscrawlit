@@ -25,13 +25,16 @@
   Respeta siempre robots.txt y va a un ritmo que no molesta al servidor.
 - **Encuentra los problemas técnicos:** enlaces rotos, errores 404 y 500, redirecciones en cadena, títulos y
   descripciones, encabezados, canonicals, indexación, hreflang, imágenes pesadas, datos estructurados,
-  seguridad, SEO local, ortografía y más.
+  seguridad, ortografía y más (y SEO local, si lo activas).
 - **Separa lo que siempre es un error de lo que depende de cada caso**, y para cada problema dice por qué importa y
   cómo se arregla.
 - **Prepara informes para clientes** en lenguaje sencillo, con tu marca y tu logo: PDF, HTML, PowerPoint y Excel.
 - **Compara auditorías** y muestra la evolución de una web con el tiempo.
-- **Consultor SEO con IA, opcional**, con tu propia clave (Claude, OpenAI, Gemini, Groq) o con un modelo en tu
-  equipo (Ollama).
+- **Anota mientras auditas:** marca varias URLs, pulsa «Anotar» y añade con un clic los problemas que comparten. Las
+  notas pasan al informe del cliente.
+- **IA opcional, con tus instrucciones:** escribe el title, la meta description y los datos estructurados de las
+  páginas que elijas, con el tono de cada cliente (fichas de cliente), y un consultor SEO al que preguntar. Con tu
+  propia clave (Claude, OpenAI, Gemini, Groq) o con un modelo en tu equipo (Ollama).
 
 ## Privado y respetuoso
 

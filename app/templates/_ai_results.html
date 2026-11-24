@@ -1,7 +1,34 @@
 {% if error %}<div class="alert error" role="alert">{{ error }}</div>{% endif %}
-{% for r in results or [] %}
-  <div class="card" style="margin:8px 0; padding:10px">
+{% for r in (results or [])|sort(attribute='created_at', reverse=true) %}
+  {% set sp = parse_seo_pack(r.result) if r.task == 'seo_pack' else none %}
+  <div class="card ai-card" style="margin:8px 0; padding:10px">
     <div class="muted" style="font-size:12px">{{ tasks[r.task][0] if r.task in tasks else r.task }} · {{ r.model }} · {{ r.created_at[:16].replace('T', ' ') }} UTC</div>
+    {% if sp %}
+    <div class="sp">
+      <div class="sp-field">
+        <div class="sp-h"><b>Title</b><span class="sp-len {{ 'ok' if sp.title_ok else 'warn' }}" title="Recomendado: 30-60 caracteres">{{ sp.title_len }} caracteres</span>
+          <button type="button" class="secondary mini sp-copy" data-click="copyBlock" data-args='["$this"]'>Copiar</button></div>
+        <div class="sp-val">{{ sp.title }}</div>
+      </div>
+      <div class="sp-field">
+        <div class="sp-h"><b>Meta description</b><span class="sp-len {{ 'ok' if sp.description_ok else 'warn' }}" title="Recomendado: 120-158 caracteres">{{ sp.description_len }} caracteres</span>
+          <button type="button" class="secondary mini sp-copy" data-click="copyBlock" data-args='["$this"]'>Copiar</button></div>
+        <div class="sp-val">{{ sp.description }}</div>
+      </div>
+      {% if sp.jsonld %}
+      <div class="sp-field">
+        <div class="sp-h"><b>Datos estructurados</b>{% if sp.schema_type %}<span class="sp-len">{{ sp.schema_type }}</span>{% endif %}
+          <button type="button" class="secondary mini sp-copy" data-click="copyBlock" data-args='["$this"]' title="Copia el bloque script completo, listo para pegar en el head de la página">Copiar</button></div>
+        <pre class="sp-val sp-code">&lt;script type="application/ld+json"&gt;
+{{ sp.jsonld }}
+&lt;/script&gt;</pre>
+      </div>
+      {% endif %}
+      {% if sp.notes %}<p class="sp-notes muted">{{ sp.notes }}</p>{% endif %}
+      <p class="sp-notes muted">Revísalo antes de publicarlo y valida el JSON-LD en la Prueba de resultados enriquecidos de Google.</p>
+    </div>
+    {% else %}
     <pre style="margin:6px 0 0; max-height:none">{{ r.result }}</pre>
+    {% endif %}
   </div>
 {% endfor %}

@@ -41,10 +41,10 @@ def test_journal_in_the_app_and_report(site):  # noqa: F811
         assert 'id="journal"' in page and 'id="apuntar-dlg"' in page and 'id="download-dlg"' in page
         from app.urlutil import site_key
         nl = chr(10)
-        # «📝 Apuntar» with URLs selected: a text box plus their problems, to add with one click
+        # «Anotar» with URLs selected: a text box plus their problems, to add with one click
         bad = next(i for i in db.load_issues(int(cid)))
         form = client.post(f"/crawls/{cid}/journal/compose", data={"urls": nl.join([bad["url"], base + "/nada"])}).text
-        assert "Nota para 2 URLs" in form and "<b>1/2</b>" in form and "Guardar nota" in form and "Revisar con el cliente" in form
+        assert "Nota para 2 URLs" in form and ">1/2</span>" in form and "Guardar nota" in form and "Revisar con el cliente" in form
         assert "Marca antes" in client.post(f"/crawls/{cid}/journal/compose", data={"urls": "javascript:x"}).text
         # saving: the note keeps its URLs (bad and repeated ones dropped), escaped
         client.post(f"/crawls/{cid}/journal", data={"text": "Revisar el <script>alert(1)</script> del cliente",

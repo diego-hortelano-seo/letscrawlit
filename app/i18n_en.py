@@ -1351,3 +1351,105 @@ EN.update({
 EN.update({"Avisar de versiones nuevas": "Notify me of new versions"})
 
 EN.update({"En tu ordenador. Nada sale de él salvo que uses la IA, PageSpeed o los datos de Google, y solo cuando tú lo pides. Lo único automático es preguntar a GitHub si hay una versión nueva, sin enviar nada tuyo (se desactiva en Vista).": "On your computer. Nothing leaves it unless you use the AI, PageSpeed or Google data, and only when you ask for it. The only automatic thing is asking GitHub whether there is a new version, without sending anything of yours (you can turn it off in View)."})
+
+# Notes v3, optional local SEO and AI title/description/JSON-LD
+EN.update({
+    "Problemas de estas URLs": "Problems on these URLs",
+    "toca para añadirlo a la nota": "tap to add it to the note",
+    "Frases rápidas": "Quick phrases",
+    "Title": "Title",
+    "Meta description": "Meta description",
+    "Recomendado: 30-60 caracteres": "Recommended: 30-60 characters",
+    "Recomendado: 120-158 caracteres": "Recommended: 120-158 characters",
+    "Copia el bloque script completo, listo para pegar en el head de la página": "Copies the whole script block, ready to paste into the page head",
+    "Revísalo antes de publicarlo y valida el JSON-LD en la Prueba de resultados enriquecidos de Google.": "Review it before publishing and validate the JSON-LD in Google's Rich Results Test.",
+    "Lee el contenido de la página y te propone los tres, listos para copiar.": "Reads the page content and proposes all three, ready to copy.",
+    "Escribir title, meta description y datos estructurados": "Write title, meta description and structured data",
+    "Title, description y datos estructurados": "Title, description and structured data",
+    "Escribe los tres a partir del contenido. Salen en tres columnas de la pestaña «IA», listos para exportar.": "Writes all three from the content. They appear in three columns of the «AI» tab, ready to export.",
+    "Cerrajero urgente en Madrid 24 h | Cerrajería López · Service": "Emergency locksmith in London 24/7 | Smith & Sons · Service",
+    "Title propuesto": "Proposed title",
+    "Description propuesta": "Proposed description",
+    "JSON-LD propuesto": "Proposed JSON-LD"
+})
+
+# «IA» menu
+EN.update({
+    "Configurar la IA…": "Set up the AI…",
+    "de todas las páginas de la vista actual": "for every page in the current view",
+    "disponible al terminar el rastreo": "available when the crawl finishes",
+    "Otras tareas de IA en bloque…": "Other bulk AI tasks…",
+    "Ver los resultados (pestaña IA)": "See the results (AI tab)",
+    "Hacerlo con todas las páginas →": "Do it for every page →"
+})
+
+# Client profiles and «¿En qué URLs?»
+EN.update({
+    "Clientes": "Clients",
+    "Clientes…": "Clients…",
+    "Clientes y su contexto…": "Clients and their context…",
+    "tono, público y negocio de cada cliente, para que la IA escriba como él": "each client's tone, audience and business, so the AI writes like them",
+    "Nuevo cliente": "New client",
+    "Identidad": "Identity",
+    "Nombre del cliente *": "Client name *",
+    "Ej.: Clínica Fisioterapia González": "E.g.: Smith Physiotherapy Clinic",
+    "Sector": "Industry",
+    "Fisioterapia, ecommerce de moda, SaaS B2B…": "Physiotherapy, fashion ecommerce, B2B SaaS…",
+    "Público objetivo": "Target audience",
+    "Mujeres de 35 a 50 años con dolor crónico de espalda…": "Women aged 35 to 50 with chronic back pain…",
+    "Voz y estilo": "Voice and style",
+    "Tono y estilo de escritura": "Tone and writing style",
+    "Cercano, tutea al lector, frases cortas, sin tecnicismos…": "Friendly, talks to the reader as «you», short sentences, no jargon…",
+    "Términos a evitar": "Terms to avoid",
+    "competencia, barato, revolucionario…": "competitors, cheap, revolutionary…",
+    "Contexto del negocio": "Business context",
+    "Describe el negocio, sus servicios o productos, qué le diferencia…": "Describe the business, its services or products, what sets it apart…",
+    "Guardar cliente": "Save client",
+    "La IA lee la ficha del cliente antes de escribir titles, descriptions o datos estructurados, y escribe con su tono. Elige el cliente en «IA en bloque» o en el panel de IA de cada URL.": "The AI reads the client's profile before writing titles, descriptions or structured data, and writes in their tone. Choose the client in «Bulk AI» or in each URL's AI panel.",
+    "Editar la ficha": "Edit the profile",
+    "Borrar la ficha": "Delete the profile",
+    "¿Borrar esta ficha de cliente?": "Delete this client profile?",
+    "Aún no hay clientes.": "No clients yet.",
+    "Escribe al menos el nombre del cliente.": "Write at least the client's name.",
+    "Escribir para": "Write for",
+    "Sin ficha de cliente": "No client profile",
+    "Crear una ficha de cliente": "Create a client profile",
+    "2. ¿En qué URLs?": "2. On which URLs?",
+    "Solo las URLs que selecciones": "Only the URLs you select",
+    "Márcalas en la tabla con «Seleccionar varias», Ctrl+clic o Mayús+clic.": "Mark them in the table with «Select several», Ctrl+click or Shift+click.",
+    "3. ¿Para qué cliente?": "3. For which client?",
+    "No hay URLs seleccionadas en la tabla (o no son páginas HTML).": "No URLs are selected in the table (or they are not HTML pages)."
+})
+
+EN.update({"Todas las páginas de la vista actual": "Every page in the current view"})
+
+# «Anotar» (the notes are «Notas»)
+EN.update({
+    "Anotar": "Add note",
+    "Anotar sobre esta URL": "Add a note to this URL",
+    "Escribir una nota sobre las URLs seleccionadas": "Write a note about the selected URLs",
+    "Notas sobre este problema": "Notes about this issue"
+})
+
+# «IA» tab
+EN.update({
+    "Title actual": "Current title",
+    "Los resultados van apareciendo en esta tabla.": "The results appear in this table as they arrive.",
+    "Haz clic en una fila para ver la propuesta completa y copiarla. Exporta la vista para pasársela al cliente o al desarrollador.": "Click a row to see the full proposal and copy it. Export the view to hand it to the client or the developer.",
+    "La IA escribe por ti el title, la meta description y los datos estructurados de cada página": "The AI writes the title, meta description and structured data of each page for you",
+    "Elige en qué páginas y para qué cliente, y las propuestas aparecen aquí, al lado de lo que hay ahora, listas para revisar y exportar.": "Choose which pages and for which client, and the proposals appear here, next to what the page has now, ready to review and export.",
+    "Otras tareas…": "Other tasks…",
+    "Tono, público y negocio de cada cliente": "Each client's tone, audience and business",
+    "Elige las páginas.": "Choose the pages.",
+    "Todas las de la vista, o solo las que marques en cualquier pestaña con «Seleccionar varias».": "All the pages in the view, or only the ones you mark in any tab with «Select several».",
+    "Elige el cliente.": "Choose the client.",
+    "La IA lee su ficha (tono, público, términos a evitar) y escribe como él.": "The AI reads their profile (tone, audience, terms to avoid) and writes like them.",
+    "Revisa y exporta.": "Review and export.",
+    "Cada propuesta sale aquí al lado de la actual; haz clic en una fila para copiarla.": "Each proposal appears here next to the current one; click a row to copy it."
+})
+
+# AI rate limits and cut-off answers
+EN.update({
+    "El proveedor pide ir más despacio (límite de su plan): sigue solo, una página cada vez.": "The provider asks to slow down (its plan's limit): it carries on by itself, one page at a time.",
+    "La respuesta llegó cortada y faltan los datos estructurados: vuelve a generarla.": "The answer arrived cut off and the structured data is missing: generate it again."
+})

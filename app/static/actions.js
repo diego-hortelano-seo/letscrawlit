@@ -57,6 +57,20 @@
   });
 })();
 
+// «Clientes»: the client profiles the AI writes for (menu IA, and «Nuevo cliente» in the AI windows)
+function openClients(mode) {
+  var d = document.getElementById('clients-dlg');
+  if (!d) return;
+  if (!d.open) d.showModal();
+  htmx.ajax('GET', '/clients' + (mode === 'new' ? '?new=1' : ''), {target: '#clients-slot', swap: 'innerHTML'});
+}
+
+// «Hacerlo con todas las páginas» in a URL's AI panel: on the audit page open «IA en bloque» right there;
+// on the standalone detail page follow the link, which opens it on the audit page (?ai=<task>).
+function bulkFromDetail(task) {
+  if (typeof openBulk === 'function' && document.getElementById('ai-dlg')) { openBulk(task); return false; }
+}
+
 // Texts written by scripts, in the interface language (the server fills #lc-i18n when the page is in English).
 var LC_I18N = null;
 function lcT(s) {

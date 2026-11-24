@@ -1,0 +1,51 @@
+{# «Clientes»: who each client is and how they write. The AI reads it before writing titles, descriptions… #}
+<div id="clients-box">
+  {% if error %}<div class="alert error" role="alert">{{ error }}</div>{% endif %}
+  {% if ok %}<div class="alert ok" role="status">{{ ok }}</div>{% endif %}
+  {% if editing %}
+  <form class="cl-form" hx-post="/clients{{ '/' ~ edit.id if edit else '' }}" hx-target="#clients-box" hx-swap="outerHTML" autocomplete="off">
+    <div class="cl-head"><h3>{{ edit.name if edit else 'Nuevo cliente' }}</h3>
+      <button type="button" class="secondary mini" hx-get="/clients" hx-target="#clients-box" hx-swap="outerHTML">Cancelar</button></div>
+    <section class="cl-sec">
+      <p class="cl-step"><span class="cl-n">1</span> Identidad</p>
+      <label for="cl-name">Nombre del cliente *</label>
+      <input id="cl-name" name="name" type="text" maxlength="120" required value="{{ f.name or '' }}" placeholder="Ej.: Clínica Fisioterapia González">
+      <label for="cl-sector">Sector</label>
+      <input id="cl-sector" name="sector" type="text" maxlength="200" value="{{ f.sector or '' }}" placeholder="Fisioterapia, ecommerce de moda, SaaS B2B…">
+      <label for="cl-audience">Público objetivo</label>
+      <input id="cl-audience" name="audience" type="text" maxlength="400" value="{{ f.audience or '' }}" placeholder="Mujeres de 35 a 50 años con dolor crónico de espalda…">
+    </section>
+    <section class="cl-sec">
+      <p class="cl-step"><span class="cl-n">2</span> Voz y estilo</p>
+      <label for="cl-tone">Tono y estilo de escritura</label>
+      <textarea id="cl-tone" name="tone" rows="3" maxlength="1500" placeholder="Cercano, tutea al lector, frases cortas, sin tecnicismos…">{{ f.tone or '' }}</textarea>
+      <label for="cl-avoid">Términos a evitar</label>
+      <input id="cl-avoid" name="avoid" type="text" maxlength="600" value="{{ f.avoid or '' }}" placeholder="competencia, barato, revolucionario…">
+    </section>
+    <section class="cl-sec">
+      <p class="cl-step"><span class="cl-n">3</span> Contexto del negocio</p>
+      <label for="cl-context" class="sr-only">Contexto del negocio</label>
+      <textarea id="cl-context" name="context" rows="5" maxlength="4000" placeholder="Describe el negocio, sus servicios o productos, qué le diferencia…">{{ f.context or '' }}</textarea>
+    </section>
+    <div class="cl-actions"><button type="submit">Guardar cliente</button></div>
+  </form>
+  {% else %}
+  <p class="muted cl-intro">La IA lee la ficha del cliente antes de escribir titles, descriptions o datos estructurados, y escribe con su tono. Elige el cliente en «IA en bloque» o en el panel de IA de cada URL.</p>
+  <ul class="cl-list">
+    {% for c in clients %}
+    <li class="cl-item">
+      <div class="cl-body"><b>{{ c.name }}</b>{% if c.sector %}<span class="muted"> · {{ c.sector }}</span>{% endif %}
+        {% if c.tone %}<div class="cl-sub muted">{{ c.tone | truncate(110) }}</div>{% endif %}
+        {% if c.sites %}<div class="cl-sites">{% for s in c.sites[-3:] %}<span class="jn-chip">{{ s }}</span>{% endfor %}</div>{% endif %}</div>
+      <span class="jn-acts">
+        <button type="button" class="jn-icon" hx-get="/clients?edit={{ c.id }}" hx-target="#clients-box" hx-swap="outerHTML" title="Editar" aria-label="Editar la ficha"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M11.3 1.7a1.5 1.5 0 0 1 2.1 0l.9.9a1.5 1.5 0 0 1 0 2.1L5.6 13.4 2 14l.6-3.6z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg></button>
+        <button type="button" class="jn-icon jn-del" hx-post="/clients/{{ c.id }}/delete" hx-target="#clients-box" hx-swap="outerHTML" hx-confirm="¿Borrar esta ficha de cliente?" title="Borrar" aria-label="Borrar la ficha"><svg viewBox="0 0 16 16" width="14" height="14" aria-hidden="true"><path d="M2.5 4h11M6 4V2.5h4V4M4 4l.7 9.5h6.6L12 4M6.8 6.5v5M9.2 6.5v5" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"/></svg></button>
+      </span>
+    </li>
+    {% else %}
+    <li class="jn-empty muted">Aún no hay clientes.</li>
+    {% endfor %}
+  </ul>
+  <div class="cl-actions"><button type="button" hx-get="/clients?new=1" hx-target="#clients-box" hx-swap="outerHTML">Nuevo cliente</button></div>
+  {% endif %}
+</div>

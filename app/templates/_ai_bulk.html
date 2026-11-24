@@ -1,8 +1,9 @@
 <div id="ai-bulk" {% if job and job.running %}hx-get="/crawls/{{ crawl.id }}/ai/bulk" hx-trigger="every 2s" hx-swap="outerHTML"{% endif %}>
   {% if job and job.running %}
-    <p><span class="spinner"></span> <strong>{{ job.label }}</strong>: {{ job.done }} de {{ job.total }} páginas
+    <p><span class="spinner"></span> <strong>{{ job.label }}</strong>{% if job.client %}<span class="muted"> · {{ job.client }}</span>{% endif %}: {{ job.done }} de {{ job.total }} páginas
       {% if job.errors %}<span class="err">· {{ job.errors }} error(es)</span>{% endif %} · {{ job.provider }} · {{ job.model }}</p>
     <div class="progress"><div style="width:{{ (100 * job.done / job.total)|round }}%"></div></div>
+    {% if job.note %}<p class="muted">{{ job.note }}</p>{% endif %}
     <p><button type="button" class="secondary mini" hx-post="/crawls/{{ crawl.id }}/ai/bulk/cancel" hx-target="#ai-bulk" hx-swap="outerHTML">Detener</button>
       <span class="muted">Los resultados aparecen en la pestaña «IA» según llegan.</span></p>
   {% else %}
@@ -36,10 +37,21 @@
         </div>
       </div>
       {% if ai.enabled %}
-      <p class="muted">Se aplicará a las <strong>{{ count if count is not none else '…' }}</strong> páginas HTML de la vista actual (pestaña, filtro y búsqueda), como mucho {{ max_pages }}.
-        Una petición por página a {{ ai.provider }} ({{ ai.model }}){% if ai.provider != 'ollama' %}: el texto de cada página sale de tu equipo y tiene coste según tu plan{% endif %}.</p>
+      <p class="ai-step">2. ¿En qué URLs?</p>
+      <input type="hidden" name="urls" id="bulk-sel-urls" value="">
+      <div class="ai-scope">
+        <label class="ai-scope-opt{{ ' off' if not nsel }}"><input type="radio" name="scope" value="selected" {% if scope == 'selected' and nsel %}checked{% endif %} {% if not nsel %}disabled{% endif %}>
+          <span>{% if nsel %}<strong>Solo las {{ nsel }} URLs que has seleccionado</strong>{% else %}<strong>Solo las URLs que selecciones</strong>{% endif %}
+            <span class="muted">Márcalas en la tabla con «Seleccionar varias», Ctrl+clic o Mayús+clic.</span></span></label>
+        <label class="ai-scope-opt"><input type="radio" name="scope" value="view" {% if scope != 'selected' or not nsel %}checked{% endif %}>
+          <span><strong>Todas las páginas de la vista actual ({{ count if count is not none else '…' }})</strong>
+            <span class="muted">Las de la pestaña, el filtro y la búsqueda que tienes puestos, como mucho {{ max_pages }}.</span></span></label>
+      </div>
+      <p class="ai-step">3. ¿Para qué cliente?</p>
+      <div id="bulk-client-wrap" hx-get="/clients/pick?crawl={{ crawl.id }}&pick=bulk-client" hx-trigger="clientsChanged from:body" hx-include="#bulk-client" hx-swap="innerHTML">{% with pick_id = 'bulk-client' %}{% include "_client_pick.html" %}{% endwith %}</div>
+      <p class="muted ai-cost">Una petición por página a {{ ai.provider }} ({{ ai.model }}){% if ai.provider != 'ollama' %}: el texto de cada página sale de tu equipo y tiene coste según tu plan{% endif %}.</p>
       <div class="ai-actions">
-        <button type="submit" class="mini" {% if not count %}disabled{% endif %}>Empezar</button>
+        <button type="submit" class="mini" {% if not count and not nsel %}disabled{% endif %}>Empezar</button>
         <button type="button" class="secondary mini" data-click="openAiSetup">Cambiar de IA</button>
       </div>
       {% endif %}

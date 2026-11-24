@@ -87,7 +87,7 @@ def type_group(ctype: str | None, url: str = "") -> str:
 RESOURCE_STATE = "Recurso (no HTML)"
 
 
-AI_COLUMNS = ("intent", "topic", "meta_rewrite", "custom", "summary", "translate_en")
+AI_COLUMNS = ("intent", "topic", "meta_rewrite", "custom", "summary", "translate_en", "seo_title", "seo_description", "seo_schema")
 
 
 def _note_fields(n: dict | None) -> dict:
@@ -131,9 +131,7 @@ def build_rows(pages: list[dict], links: list[dict], images: list[dict], externa
     notes = notes or {}
     # external <a> links are only kept when «Almacenar enlaces externos» is on: otherwise the count is unknown, not 0
     ext_stored = bool(options.get("store_external", True) or options.get("check_external"))
-    ai_by_url: dict[str, dict] = defaultdict(dict)
-    for a in ai_results or []:
-        ai_by_url[a["url"]]["ai_" + a["task"]] = (a["result"] or "").strip()
+    ai_by_url = ai_fields(ai_results)
     vocab = set(spelling_vocab or ())
     sitemap_urls = sitemap_urls or set()
     near_dups = near_dups or {}
@@ -847,8 +845,11 @@ STATIC_TABS: list[Tab] = [
          ("no_author", "Sin autor", lambda r: r["has_pdf_props"] and not r["pdf_author"])],
         base=lambda r: "pdf" in (r.get("content_type") or "") or r["url"].lower().split("?")[0].endswith(".pdf")),
     Tab("ai", "IA", "pages",
-        [ADDR, ("title", "Título 1"), ("ai_intent", "Intención de búsqueda"), ("ai_topic", "Palabra clave | grupo"),
-         ("meta_description", "Meta description actual"), ("ai_meta_rewrite", "Meta description propuesta"),
+        # each proposal next to what the page has now; empty AI columns are hidden (main.grid_context)
+        [ADDR, ("title", "Title actual"), ("ai_seo_title", "Title propuesto"),
+         ("meta_description", "Meta description actual"), ("ai_seo_description", "Description propuesta"),
+         ("ai_meta_rewrite", "Meta description propuesta"), ("ai_seo_schema", "JSON-LD propuesto"),
+         ("ai_intent", "Intención de búsqueda"), ("ai_topic", "Palabra clave | grupo"),
          ("ai_custom", "Mi instrucción"), ("ai_summary", "Resumen"), ("ai_translate_en", "Traducción (inglés)"), IDX],
         [("done", "Con algún resultado de IA", lambda r: any(r.get(f"ai_{k}") for k in AI_COLUMNS)),
          ("pending", "Sin analizar", lambda r: not any(r.get(f"ai_{k}") for k in AI_COLUMNS))]
@@ -866,7 +867,8 @@ STATIC_TABS: list[Tab] = [
 def tabs_for(crawl: dict | None) -> list[Tab]:
     """Static tabs + custom search/extraction tabs defined in this crawl's configuration + issues."""
     cfg = (crawl or {}).get("settings") or {}
-    tabs = list(STATIC_TABS)
+    from .localseo import wanted as local_wanted
+    tabs = [t for t in STATIC_TABS if t.key != "local" or local_wanted(cfg)]  # local SEO only when it was asked for
     searches = cfg.get("searches") or []
     tabs.append(Tab("search", "Búsqueda personalizada", "pages",
         [ADDR, *((f"search::{s['name']}", f"{s['name']} ({'contiene' if s['mode'] == 'contains' else 'no contiene'})") for s in searches), IDX],
@@ -895,10 +897,11 @@ def workbench(crawl: dict) -> dict:
     site = db.note_scope(crawl["id"])  # notes belong to this audit only
     sig = (crawl["status"], crawl["pages_done"], crawl.get("ext_done"), crawl.get("phase"), crawl.get("finished_at"),
            db.analytics_version(crawl["id"]), db.notes_version(site),
-           dictionary.version(), db.ai_version(crawl["id"]))
+           dictionary.version())  # AI results are laid on top by _apply_ai, without a rebuild
     with _cache_lock:
         hit = _cache.get(crawl["id"])
         if hit and hit[0] == sig:
+            _apply_ai(crawl["id"], hit[1])
             return hit[1]
     cid = crawl["id"]
     data = build_rows(db.load_pages(cid), db.load_links(cid), db.load_images(cid), db.load_externals(cid),
@@ -906,12 +909,41 @@ def workbench(crawl: dict) -> dict:
                       set(db.load_insight(cid, "spelling_vocab", [])) | dictionary.words()
                       | set(re.findall(r"[^\s,;]+", ((crawl.get("settings") or {}).get("custom_dictionary") or "").lower())),
                       (db.load_insight(cid, "local", {}) or {}).get("pages") or {}, db.get_notes(site),
-                      crawl.get("settings") or {}, db.load_ai(cid))
+                      crawl.get("settings") or {})
     with _cache_lock:
+        _apply_ai(cid, data)
         _cache[cid] = (sig, data)
         if len(_cache) > 5:
             _cache.pop(next(iter(_cache)))
     return data
+
+
+def ai_fields(ai_results: list[dict] | None) -> dict[str, dict]:
+    """url -> {ai_<task>: text}; the «seo_pack» answer becomes three columns you can export and paste."""
+    out: dict[str, dict] = defaultdict(dict)
+    for a in ai_results or []:
+        if a["task"] == "seo_pack":
+            from .ai import parse_seo_pack
+            sp = parse_seo_pack(a["result"]) or {}
+            out[a["url"]].update(ai_seo_title=sp.get("title", ""), ai_seo_description=sp.get("description", ""),
+                                 ai_seo_schema=sp.get("jsonld", ""))
+        else:
+            out[a["url"]]["ai_" + a["task"]] = (a["result"] or "").strip()
+    return out
+
+
+def _apply_ai(cid: int, data: dict) -> None:
+    """AI results change one page at a time while «IA en bloque» runs: refresh only their columns instead of
+    rebuilding the whole audit (pages, links, images…) for every new answer."""
+    v = db.ai_version(cid)
+    if data.get("_ai_v") == v:
+        return
+    by_url = ai_fields(db.load_ai(cid))
+    keys = {f"ai_{k}" for k in AI_COLUMNS}
+    for r in data["pages"]:
+        r.update(dict.fromkeys(keys, ""))
+        r.update(by_url.get(r["url"], {}))
+    data["_ai_v"] = v
 
 
 def tab_rows(data: dict, tab: Tab, flt: str) -> list[dict]:

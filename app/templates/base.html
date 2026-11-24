@@ -28,5 +28,11 @@
   </div></header>
   {% endblock %}
   <main class="{% block main_class %}{% endblock %}">{% block content %}{% endblock %}</main>
+  {# «Clientes»: on every page, so the AI panel of a URL opened on its own page can reach it too #}
+  <dialog class="note-dlg cl-dlg" id="clients-dlg">
+    <div style="display:flex; align-items:center"><h3 style="margin:0">Clientes</h3><span style="flex:1"></span>
+      <button type="button" class="secondary mini" data-click="closeDialog" data-args='["$this"]' aria-label="Cerrar">Cerrar</button></div>
+    <div id="clients-slot"></div>
+  </dialog>
 </body>
 </html>

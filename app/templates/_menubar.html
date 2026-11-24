@@ -107,6 +107,16 @@
     {{ item('IA en bloque sobre la vista actual…', act='openBulk', enabled=done) }}
     {{ item('Notas de esta web…', act='toggleJournal', enabled=c is not none) }}
   </div></details>
+  <details class="mb mb-right"><summary>IA</summary><div class="mb-list">
+    {% if done %}<button type="button" class="mi" data-click="openBulk" data-args='["seo_pack"]'>Escribir title, meta description y datos estructurados<small>de todas las páginas de la vista actual</small></button>
+    {{ item('Otras tareas de IA en bloque…', act='openBulk') }}
+    {{ item('Ver los resultados (pestaña IA)', act='htmxLoad', args=['/crawls/' ~ c.id ~ '/grid?tab=ai', '#grid']) }}
+    {% else %}<span class="mi disabled" aria-disabled="true">Escribir title, meta description y datos estructurados<small>disponible al terminar el rastreo</small></span>{% endif %}
+    <div class="mb-sep"></div>
+    <button type="button" class="mi" data-click="openClients">Clientes y su contexto…<small>tono, público y negocio de cada cliente, para que la IA escriba como él</small></button>
+    {{ item('Consultor con IA', act='openConsult', args=[c.id if c else 0]) }}
+    {{ item('Configurar la IA…', act='openAiSetup') }}
+  </div></details>
   <details class="mb"><summary>Ayuda</summary><div class="mb-list">
     {{ item('Manual de uso', '/manual') }}
     {{ item('Tu primera auditoría, paso a paso', '/manual#primera') }}

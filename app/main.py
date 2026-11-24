@@ -58,6 +58,7 @@ def _diagnostics() -> dict:
 
 templates.env.globals["diagnostics"] = _diagnostics
 templates.env.globals["simple_tabs"] = list(views.SIMPLE_TABS)
+templates.env.globals["parse_seo_pack"] = ai.parse_seo_pack
 # cache-busting for /static: browsers reload CSS/JS after an update instead of using the old copy
 class _StaticVersion:
     """Cache-busting stamp for /static links: the newest file time, read on every render so edits show up at once."""
@@ -375,6 +376,22 @@ async def create_crawl(request: Request):
     return RedirectResponse(f"/crawls/{crawl_id}", status_code=303)
 
 
+def _ai_tab_context(crawl: dict, t, ctx: dict):
+    """«IA» tab: only the AI columns that have something, plus what the banner above the table needs
+    (how many pages have results, whether a job is running, the client of this site)."""
+    import dataclasses
+    from . import aibulk
+    pages = views.query(views.workbench(crawl), t, "", "")
+    filled = {k for k, _ in t.columns if k.startswith("ai_") and any(r.get(k) for r in pages)}
+    done = sum(1 for r in pages if any(r.get(k) for k in filled))
+    ai_st = ai.status()
+    ctx["ai_tab"] = {"total": len(pages), "done": done, "job": aibulk.status(crawl["id"]), "enabled": ai_st["enabled"],
+                     "client": _client_for(crawl, None) if ai_st["enabled"] else None}
+    if not filled:
+        return t
+    return dataclasses.replace(t, columns=[c for c in t.columns if not c[0].startswith("ai_") or c[0] in filled])
+
+
 def grid_context(crawl: dict, tab: str, f: str, q: str, sort: str, dir: str, page: int = 1,
                  start: int = 0, upto: int = 0) -> dict:
     """The table loads PAGE_SIZE rows and then more as you scroll (start = first row of the next chunk).
@@ -391,6 +408,8 @@ def grid_context(crawl: dict, tab: str, f: str, q: str, sort: str, dir: str, pag
     if f not in {k for k, _, _ in t.filters}:
         ctx["f"] = f = ""
     ctx["fhelp"] = views.any_filter_help(t.key, f, dict((k, l) for k, l, _ in t.filters).get(f, "")) if f else None
+    if t.key == "ai":
+        t = ctx["tab"] = _ai_tab_context(crawl, t, ctx)
     rows = views.query(views.workbench(crawl), t, f, ctx["q"], sort, ctx["dir"] == "desc")
     total = len(rows)
     start = max(0, min(start or (max(1, page) - 1) * PAGE_SIZE, total))
@@ -661,7 +680,9 @@ async def crawl_detail(request: Request, crawl_id: int, url: str, src: str = "pa
         if sub == "path":
             ctx["crawl_path"] = views.crawl_path(db.load_links(crawl_id), crawl["start_url"], url)
         if sub == "ai":
+            from . import clients
             ctx["ai_results"], ctx["ai_status"], ctx["ai_tasks"] = db.load_ai(crawl_id, url), ai.status(), ai.TASKS
+            ctx["clients"], ctx["client"] = clients.load(), _client_for(crawl, None)
         if sub == "source":
             ctx["sources"] = stored_html(crawl_id, url)
         if sub == "screenshot" and not row.get("screenshot"):
@@ -983,13 +1004,18 @@ async def waterfall_view(request: Request, crawl_id: int, url: str):
 
 @app.post("/crawls/{crawl_id}/ai", response_class=HTMLResponse)
 async def ai_task(request: Request, crawl_id: int, url: str, task: str):
-    get_crawl_or_404(crawl_id)
+    from . import clients
+    crawl = get_crawl_or_404(crawl_id)
     page = db.get_page(crawl_id, url)
     if not page:
         raise HTTPException(404, "Esa URL no está en este rastreo.")
+    cid = str((await request.form()).get("client") or "none")
+    client = _client_for(crawl, cid)
     try:
-        result, model = await asyncio.to_thread(ai.run_task, task, page)
+        result, model = await (asyncio.to_thread(ai.run_task, task, page, "", client) if client
+                               else asyncio.to_thread(ai.run_task, task, page))
         db.save_ai(crawl_id, url, task, result, model)
+        clients.remember_site(client["id"] if client else None, _crawl_site(crawl))
         error = None
     except ai.AIUnavailable as exc:
         error = str(exc)
@@ -1125,6 +1151,9 @@ async def ai_setup_test(request: Request):
 
 
 AI_TASK_CARDS = {  # what each bulk task does, in plain words, with an example of the answer
+    "seo_pack": ("", "Title, description y datos estructurados",
+                 "Escribe los tres a partir del contenido. Salen en tres columnas de la pestaña «IA», listos para exportar.",
+                 "Cerrajero urgente en Madrid 24 h | Cerrajería López · Service"),
     "intent": ("", "Intención de búsqueda", "¿La página quiere informar, vender o atraer clientes de la zona?", "transaccional"),
     "meta_rewrite": ("", "Nueva meta description", "Propone una descripción de 140–155 caracteres con llamada a la acción.",
                      "Cerrajero urgente en Madrid 24 h. Llegamos en 20 minutos y sin romper la puerta. ¡Llama ya!"),
@@ -1139,13 +1168,35 @@ AI_TASK_CARDS = {  # what each bulk task does, in plain words, with an example o
 }
 
 
+def _crawl_site(crawl: dict) -> str:
+    from .urlutil import site_key
+    return site_key(crawl.get("start_url") or "")
+
+
+def _client_for(crawl: dict, cid: str | None) -> dict | None:
+    """The chosen client; with nothing chosen, the one last used on this site. "none" = without a client."""
+    from . import clients
+    if cid == "none":
+        return None
+    return clients.get(cid) if cid else clients.for_site(_crawl_site(crawl))
+
+
 def _bulk_box(request: Request, crawl: dict, message: str = "", count: int | None = None, ok: str = "",
-              task: str = "", prompt: str = ""):
-    from . import aibulk, aiprompts
+              task: str = "", prompt: str = "", client_id: str | None = None, nsel: int = 0, scope: str = ""):
+    from . import aibulk, aiprompts, clients
+    client = _client_for(crawl, client_id)
     return templates.TemplateResponse(request, "_ai_bulk.html", {
         "crawl": crawl, "job": aibulk.status(crawl["id"]), "message": message, "ok": ok, "count": count, "ai": ai.status(),
         "cards": AI_TASK_CARDS, "saved_prompts": aiprompts.load(), "max_pages": aibulk.MAX_PAGES,
-        "task": task or "intent", "prompt": prompt})
+        "task": task or "seo_pack", "prompt": prompt, "clients": clients.load(), "client": client,
+        "nsel": nsel, "scope": scope or ("selected" if nsel else "view")})
+
+
+def _selected_urls(crawl: dict, raw: str) -> list[str]:
+    """The URLs ticked in the table, kept only if they are HTML pages of this crawl."""
+    wanted = list(dict.fromkeys(u.strip() for u in (raw or "").split("\n") if u.strip()))
+    ok = {r["url"] for r in views.workbench(crawl)["pages"] if r.get("html200")} if wanted else set()
+    return [u for u in wanted if u in ok]
 
 
 @app.post("/crawls/{crawl_id}/ai/prompts", response_class=HTMLResponse)
@@ -1155,12 +1206,14 @@ async def ai_prompt_save(request: Request, crawl_id: int):
     form = await request.form()
     count = len(_bulk_urls(crawl, str(form.get("tab") or "internal"), str(form.get("f") or ""), str(form.get("q") or "")))
     prompt = str(form.get("prompt") or "")
+    keep = dict(client_id=str(form.get("client") or "none"), nsel=len(_selected_urls(crawl, str(form.get("urls") or ""))),
+                scope=str(form.get("scope") or ""))
     try:
         item = aiprompts.add(str(form.get("prompt_name") or ""), prompt)
     except (ValueError, OSError) as exc:
-        return _bulk_box(request, crawl, str(exc), count, task="custom", prompt=prompt)
+        return _bulk_box(request, crawl, str(exc), count, task="custom", prompt=prompt, **keep)
     return _bulk_box(request, crawl, count=count, ok=f"Guardada como «{item['name']}». La tienes en las tarjetas para cualquier auditoría.",
-                     task="saved:" + item["id"])
+                     task="saved:" + item["id"], **keep)
 
 
 @app.post("/crawls/{crawl_id}/ai/prompts/{pid}/delete", response_class=HTMLResponse)
@@ -1174,9 +1227,11 @@ async def ai_prompt_delete(request: Request, crawl_id: int, pid: str):
 
 
 @app.get("/crawls/{crawl_id}/ai/bulk", response_class=HTMLResponse)
-async def ai_bulk_box(request: Request, crawl_id: int, tab: str = "internal", f: str = "", q: str = ""):
+async def ai_bulk_box(request: Request, crawl_id: int, tab: str = "internal", f: str = "", q: str = "", task: str = "",
+                      nsel: int = 0, client: str = ""):
     crawl = get_crawl_or_404(crawl_id)
-    return _bulk_box(request, crawl, count=len(_bulk_urls(crawl, tab, f, q)))
+    return _bulk_box(request, crawl, count=len(_bulk_urls(crawl, tab, f, q)), task=task if task in AI_TASK_CARDS else "",
+                     nsel=max(0, nsel), client_id=client or None)
 
 
 def _bulk_urls(crawl: dict, tab: str, f: str, q: str) -> list[str]:
@@ -1192,18 +1247,27 @@ async def ai_bulk_start(request: Request, crawl_id: int):
     crawl = get_crawl_or_404(crawl_id)
     _require_finished(crawl)
     form = await request.form()
-    urls = _bulk_urls(crawl, str(form.get("tab") or "internal"), str(form.get("f") or ""), str(form.get("q") or ""))
-    from . import aiprompts
+    view = _bulk_urls(crawl, str(form.get("tab") or "internal"), str(form.get("f") or ""), str(form.get("q") or ""))
+    selected = _selected_urls(crawl, str(form.get("urls") or ""))
+    scope = str(form.get("scope") or "view")
+    urls = selected if scope == "selected" else view
+    from . import aiprompts, clients
+    cid = str(form.get("client") or "none")
+    client = _client_for(crawl, cid)
     task, prompt, label = str(form.get("task") or ""), str(form.get("prompt") or "")[:ai.MAX_CUSTOM_PROMPT], ""
+    again = dict(task=task, prompt=prompt, client_id=cid, nsel=len(selected), scope=scope)
+    if scope == "selected" and not selected:
+        return _bulk_box(request, crawl, "No hay URLs seleccionadas en la tabla (o no son páginas HTML).", len(view), **again)
     if task.startswith("saved:"):
         saved = aiprompts.get(task[6:])
         if not saved:
-            return _bulk_box(request, crawl, "Esa instrucción guardada ya no existe.", len(urls))
+            return _bulk_box(request, crawl, "Esa instrucción guardada ya no existe.", len(view), **again)
         task, prompt, label = "custom", saved["prompt"], saved["name"]
     try:
-        aibulk.start(crawl_id, task, urls, prompt, label)
+        aibulk.start(crawl_id, task, urls, prompt, label, client)
     except ai.AIUnavailable as exc:
-        return _bulk_box(request, crawl, str(exc), len(urls), task=str(form.get("task") or ""), prompt=prompt)
+        return _bulk_box(request, crawl, str(exc), len(view), **again)
+    clients.remember_site(client["id"] if client else None, _crawl_site(crawl))
     return _bulk_box(request, crawl)
 
 
@@ -1213,6 +1277,52 @@ async def ai_bulk_cancel(request: Request, crawl_id: int):
     crawl = get_crawl_or_404(crawl_id)
     aibulk.cancel(crawl_id)
     return _bulk_box(request, crawl, "Deteniendo…")
+
+
+def _clients_box(request: Request, edit: dict | None = None, new: bool = False, error: str = "", ok: str = "",
+                 form: dict | None = None, changed: bool = False):
+    from . import clients
+    resp = templates.TemplateResponse(request, "_clients.html", {
+        "clients": clients.load(), "edit": edit, "editing": bool(edit or new or form), "error": error, "ok": ok,
+        "f": form if form is not None else (edit or {})})
+    if changed:
+        resp.headers["HX-Trigger"] = "clientsChanged"  # «IA en bloque» and the AI panel reload their client list
+    return resp
+
+
+@app.get("/clients/pick", response_class=HTMLResponse)
+async def clients_pick(request: Request, crawl: int, pick: str = "ai-client", client: str = ""):
+    """The «Escribir para» selector, reloaded after a client is created, edited or deleted."""
+    from . import clients
+    c = get_crawl_or_404(crawl)
+    pick = pick if pick in ("ai-client", "bulk-client") else "ai-client"
+    return templates.TemplateResponse(request, "_client_pick.html", {
+        "clients": clients.load(), "client": _client_for(c, client or None), "pick_id": pick})
+
+
+@app.get("/clients", response_class=HTMLResponse)
+async def clients_box(request: Request, edit: str = "", new: int = 0):
+    from . import clients
+    return _clients_box(request, edit=clients.get(edit), new=bool(new))
+
+
+@app.post("/clients", response_class=HTMLResponse)
+@app.post("/clients/{cid}", response_class=HTMLResponse)
+async def clients_save(request: Request, cid: str = ""):
+    from . import clients
+    form = dict(await request.form())
+    try:
+        item = clients.save(form, cid or None)
+    except (ValueError, OSError) as exc:
+        return _clients_box(request, edit=clients.get(cid), error=str(exc), form=clients.clean(form))
+    return _clients_box(request, ok=f"Guardado: {item['name']}.", changed=True)
+
+
+@app.post("/clients/{cid}/delete", response_class=HTMLResponse)
+async def clients_delete(request: Request, cid: str):
+    from . import clients
+    clients.delete(cid)
+    return _clients_box(request, changed=True)
 
 
 @app.post("/crawls/{crawl_id}/copyscape", response_class=HTMLResponse)

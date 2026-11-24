@@ -151,6 +151,13 @@ def _nap_key(b: dict) -> tuple:
     return (fold(b["name"]).strip(), b["telephone"], fold(a.get("street", "")).replace(" ", ""), a.get("postal", ""))
 
 
+def wanted(cfg: dict | None) -> bool:
+    """The local SEO audit runs only when asked for: the box is ticked, or the business details are filled in.
+    Most sites are not local businesses, and flagging a missing LocalBusiness on them is noise."""
+    cfg = cfg or {}
+    return bool(cfg.get("local_enabled") or any(str(cfg.get(k) or "").strip() for k in ("local_name", "local_city", "local_phone")))
+
+
 def audit(pages: list[dict], links: list[dict], start_url: str | None, cfg: dict | None = None) -> dict:
     """-> {"available", "issues": [(code, url, evidence)], "pages": {url: row fields}, "site": {...}, "checklist": [...]}"""
     cfg = cfg or {}
@@ -159,7 +166,7 @@ def audit(pages: list[dict], links: list[dict], start_url: str | None, cfg: dict
     data = {p["url"]: (p.get("extra") or {}).get("local") for p in html}
     data = {u: d for u, d in data.items() if d is not None}
     result = {"available": bool(data), "issues": [], "pages": {}, "site": {}, "checklist": []}
-    if not data or cfg.get("local_enabled") is False:
+    if not data or not wanted(cfg):
         return result
     by_url = {p["url"]: p for p in html}
     issues = result["issues"]
