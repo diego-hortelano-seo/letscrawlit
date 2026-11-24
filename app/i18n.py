@@ -306,6 +306,9 @@ JS_TEXTS["No se pudo guardar: "] = "Could not save: "
 JS_TEXTS["Apuntes"] = "Notes"
 JS_TEXTS["URL seleccionada: "] = "Selected URL: "
 JS_TEXTS["Copiado"] = "Copied"
+JS_TEXTS["Tienes la versión "] = "You have version "
+JS_TEXTS["Novedades"] = "What's new"
+JS_TEXTS["Se instala encima de la que tienes: tus auditorías, notas y claves se conservan."] = "It installs over the one you have: your audits, notes and keys are kept."
 JS_TEXTS["1 URL seleccionada"] = "1 URL selected"
 JS_TEXTS.update({"Ninguna URL seleccionada": "No URL selected", " URLs seleccionadas": " URLs selected",
                  "Copiar URLs": "Copy URLs", "URLs copiadas": "URLs copied", "Las URLs seleccionadas": "The selected URLs",

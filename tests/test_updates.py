@@ -1,4 +1,6 @@
 """«Hay una versión nueva»: version comparison, the 12-hour cache and silent failures."""
+from pathlib import Path
+
 import httpx
 
 from app import updates
@@ -51,4 +53,13 @@ def test_foreign_release_url_is_replaced(monkeypatch):
             return {"tag_name": "v9.0.0", "html_url": "https://evil.example/download"}
 
     monkeypatch.setattr(updates.httpx, "get", lambda *a, **k: R())
-    assert updates._fetch() == {"version": "9.0.0", "url": updates.PAGE}
+    assert updates._fetch() == {"version": "9.0.0", "url": updates.PAGE, "notes": []}
+
+
+def test_whats_new_comes_from_the_release_text():
+    body = Path(__file__).resolve().parent.parent.joinpath("NOVEDADES.md").read_text(encoding="utf-8") + "\n## Descargar\n- no es novedad\n"
+    notes = updates.notes(body)
+    assert 1 <= len(notes) <= 6 and "no es novedad" not in notes
+    assert updates.notes("## Novedades\n- **Nuevo** [enlace](https://x.es) y `código`\n- <img src=x onerror=alert(1)>") == \
+        ["Nuevo enlace y código", "<img src=x onerror=alert(1)>"]   # plain text: the page shows it with textContent
+    assert updates.notes("Sin sección de novedades") == []

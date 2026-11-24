@@ -188,6 +188,38 @@ function checkUpdates() {
     box.appendChild(txt); box.appendChild(get); box.appendChild(later);
     var bar = document.querySelector('.menubar') || document.querySelector('header');
     if (bar && bar.parentNode) bar.parentNode.insertBefore(box, bar.nextSibling); else document.body.insertBefore(box, document.body.firstChild);
+    showWhatsNew(u);
   }).catch(function () {});
+}
+// «Novedades»: a window once per version, only on the start page (never over an audit), with what the version brings;
+// the strip above stays as a reminder. Release notes come from GitHub and are only ever shown as text.
+var UPD_POPPED = 'letscrawl.updatePopupShown';
+function showWhatsNew(u) {
+  if (location.pathname !== '/' || document.getElementById('grid') || !window.HTMLDialogElement) return;
+  try { if (localStorage.getItem(UPD_POPPED) === u.latest) return; localStorage.setItem(UPD_POPPED, u.latest); } catch (e) { return; }
+  var d = document.createElement('dialog');
+  d.className = 'note-dlg upd-dlg'; d.id = 'upd-dlg';
+  var h = document.createElement('h3'); h.textContent = lcT('Hay una versión nueva de LetsCrawlit: ') + u.latest;
+  var sub = document.createElement('p'); sub.className = 'muted'; sub.textContent = lcT('Tienes la versión ') + u.current + '.';
+  d.appendChild(h); d.appendChild(sub);
+  if (u.notes && u.notes.length) {
+    var t = document.createElement('p'); t.className = 'upd-dlg-t'; t.textContent = lcT('Novedades');
+    var ul = document.createElement('ul');
+    u.notes.forEach(function (n) { var li = document.createElement('li'); li.textContent = n; ul.appendChild(li); });
+    d.appendChild(t); d.appendChild(ul);
+  }
+  var foot = document.createElement('p'); foot.className = 'muted upd-dlg-foot';
+  foot.textContent = lcT('Se instala encima de la que tienes: tus auditorías, notas y claves se conservan.');
+  var acts = document.createElement('div'); acts.className = 'upd-dlg-actions';
+  var later = document.createElement('button'); later.type = 'button'; later.className = 'secondary'; later.textContent = lcT('Ahora no');
+  later.addEventListener('click', function () { d.close(); });
+  var get = document.createElement('a'); get.className = 'btn'; get.href = u.url; get.target = '_blank'; get.rel = 'noopener';
+  get.textContent = lcT('Descargar');
+  get.addEventListener('click', function () { d.close(); });
+  acts.appendChild(later); acts.appendChild(get);
+  d.appendChild(foot); d.appendChild(acts);
+  d.addEventListener('close', function () { d.remove(); });
+  document.body.appendChild(d);
+  d.showModal();
 }
 document.addEventListener('DOMContentLoaded', function () { setTimeout(checkUpdates, 1500); });

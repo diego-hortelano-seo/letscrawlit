@@ -182,7 +182,7 @@ enlaces externos rotos (si se activa la comprobación) y, opcionalmente, rendimi
 
 ### SEO local
 
-**Solo se hace si lo pides** (desde la 1.1.0): marca «Hacer la auditoría de SEO local» en Configuración › SEO local, o
+**Solo se hace si lo pides**: marca «Hacer la auditoría de SEO local» en Configuración › SEO local, o
 rellena el nombre, la ciudad o el teléfono del negocio. Si no, no aparecen la pestaña «SEO local» ni sus problemas
 (en una web que no es un negocio local solo serían ruido). Los datos son opcionales: si no se indican, se deducen del
 schema y del teléfono más repetido. Comprueba:
@@ -507,7 +507,7 @@ Para guardar o mover una auditoría completa (y poder reanudarla), usa «Exporta
 | `LETSCRAWL_ALLOWED_HOSTS` | (vacío) | Nombres extra con los que se puede abrir la app (p. ej. `mi-portatil.local`); por defecto solo `localhost` y direcciones IP |
 | `LETSCRAWL_OPEN_BROWSER` | `1` | Abrir el navegador al arrancar |
 | `LETSCRAWL_DATA_DIR` | `data` | Carpeta de datos |
-| `LETSCRAWL_USER_AGENT` | `LetsCrawlit/1.1.0` | User-Agent (también para robots.txt) |
+| `LETSCRAWL_USER_AGENT` | `LetsCrawlit/1.0.0` | User-Agent (también para robots.txt) |
 | `LETSCRAWL_DEFAULT_MAX_URLS` / `LETSCRAWL_MAX_URLS_LIMIT` | `0` / `0` | Tope por defecto y tope de seguridad (0 = sin límite) |
 | `LETSCRAWL_DEFAULT_DELAY` / `LETSCRAWL_MIN_DELAY` | `1.0` / `0.2` | Pausa por defecto y mínima (s) |
 | `LETSCRAWL_RENDER_TIMEOUT` | `20` | Tiempo máximo de renderizado por página (s) |

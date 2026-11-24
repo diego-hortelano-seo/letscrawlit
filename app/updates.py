@@ -46,7 +46,26 @@ def _fetch() -> dict | None:
     url = str(data.get("html_url") or "")
     if not url.startswith(f"https://github.com/{REPO}/releases/"):
         url = PAGE  # only ever link to this project's own releases page
-    return {"version": tag.lstrip("v"), "url": url} if parse(tag) else None
+    return {"version": tag.lstrip("v"), "url": url, "notes": notes(str(data.get("body") or ""))} if parse(tag) else None
+
+
+def notes(body: str, limit: int = 6) -> list[str]:
+    """The «Novedades» bullets of the release text (NOVEDADES.md), as plain lines for the «what's new» window.
+    Markdown marks are dropped; the page only ever shows them as text, never as HTML."""
+    out, inside = [], False
+    for line in body.replace("\r\n", "\n").split("\n"):
+        s = line.strip()
+        if s.startswith("#"):
+            inside = "novedades" in s.lower()
+            continue
+        if inside and s[:2] in ("- ", "* "):
+            text = re.sub(r"\*\*|__|`", "", s[2:]).strip()
+            text = re.sub(r"\[([^\]]+)\]\([^)]*\)", r"\1", text)  # [texto](enlace) -> texto
+            if text:
+                out.append(text[:220])
+        if len(out) >= limit:
+            break
+    return out
 
 
 def check(now: float | None = None) -> dict:
@@ -61,4 +80,5 @@ def check(now: float | None = None) -> dict:
             _cache["at"] = now
         latest = _cache["result"]
     return {"current": VERSION, "latest": latest["version"] if latest else None,
-            "newer": bool(latest and newer(latest["version"])), "url": latest["url"] if latest else PAGE}
+            "newer": bool(latest and newer(latest["version"])), "url": latest["url"] if latest else PAGE,
+            "notes": (latest or {}).get("notes") or []}

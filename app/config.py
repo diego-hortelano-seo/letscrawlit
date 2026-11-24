@@ -9,7 +9,7 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 BASE_DIR = Path(__file__).resolve().parent.parent
-VERSION = "1.1.0"
+VERSION = "1.0.0"
 
 # Inside the Windows program (LetsCrawlit.exe) the program folder can be replaced by a new version, so the
 # user's things — .env with their keys, crawls, notes — live in %APPDATA%\LetsCrawlit instead.

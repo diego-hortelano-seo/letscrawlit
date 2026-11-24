@@ -884,6 +884,15 @@ body.app .jn-list .jn-tick { border-radius: 50%; }
 .cl-pick label, dialog .cl-pick label { display: inline; margin: 0; font-weight: 600; }
 .cl-pick select, dialog .cl-pick select { flex: 1; width: auto; min-width: 200px; max-width: 360px; margin: 0; padding: 4px 10px; }
 
+/* «Novedades»: the new-version window */
+.upd-dlg { width: min(520px, calc(100vw - 32px)); }
+.upd-dlg h3 { margin: 0 0 4px; font-size: 18px; }
+.upd-dlg > .muted { margin: 0 0 12px; font-size: var(--fs-ui); }
+.upd-dlg-t { margin: 0 0 6px; font-weight: 700; font-size: var(--fs-ui); color: var(--accent); text-transform: uppercase; letter-spacing: .04em; }
+.upd-dlg ul { margin: 0 0 12px; padding-left: 18px; display: grid; gap: 6px; font-size: 13.5px; line-height: 1.45; }
+.upd-dlg-foot { font-size: var(--fs-sm) !important; }
+.upd-dlg-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 12px; }
+
 /* «IA» tab: what it is and how to fill it, right above the table */
 .ai-banner { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; padding: 10px 12px; border-bottom: 1px solid var(--border);
   background: color-mix(in srgb, var(--accent) 7%, var(--surface)); flex-shrink: 0; }

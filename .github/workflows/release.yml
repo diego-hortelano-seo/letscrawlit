@@ -46,20 +46,19 @@ jobs:
           name: LetsCrawlit-Setup
           path: LetsCrawlit-Setup.exe
 
+      # The release text = NOVEDADES.md (what this version brings; the app shows its «Novedades» list in the
+      # new-version window) + how to install, below.
+      - name: Texto de la versión
+        if: startsWith(github.ref, 'refs/tags/')
+        shell: pwsh
+        run: |
+          $notes = Get-Content NOVEDADES.md -Raw -Encoding utf8
+          $install = Get-Content .github/release-install.md -Raw -Encoding utf8
+          Set-Content release-body.md -Value ($notes.TrimEnd() + "`n`n" + $install) -Encoding utf8
+
       - name: Publicar en Releases
         if: startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
           files: LetsCrawlit-Setup.exe
-          body: |
-            **LetsCrawlit**: auditorías SEO técnicas desde tu ordenador. Gratis, de código abierto y sin cuentas.
-
-            ## Descargar e instalar (Windows 10 y 11)
-            1. Descarga **LetsCrawlit-Setup.exe** (abajo, en «Assets») y ábrelo.
-            2. Sigue el asistente: se instala en un minuto, sin permisos de administrador,
-               y deja LetsCrawlit en el menú Inicio y en el escritorio.
-            3. Si Windows avisa «Windows protegió su PC», pulsa **Más información › Ejecutar de todas formas**
-               (el programa aún no está firmado).
-
-            Para actualizar, instala la versión nueva encima: tus rastreos, notas y claves están en
-            `%APPDATA%\LetsCrawlit` y no se pierden. Se desinstala desde Configuración › Aplicaciones.
+          body_path: release-body.md
